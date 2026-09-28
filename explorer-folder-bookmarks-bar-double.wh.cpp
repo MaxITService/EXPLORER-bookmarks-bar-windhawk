@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar (Double Decker)
 // @description     Adds two independent, scrollable bookmark rows below the Windows 11 File Explorer address bar.
-// @version         0.7.6
+// @version         0.7.7
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -38,16 +38,15 @@ Left-click **FX** on the upper row for the profile (**~**), Desktop, Documents,
 Downloads, and custom folders from **Settings → FX custom folders**.
 Custom shortcuts are empty by default. Add a folder path and optional label
 in **Settings → FX custom folders**; blank entries are ignored. Paths must be
-absolute, and `%NAME%` environment variables are expanded. Unavailable folders
-are hidden from FX until they exist again. New settings take effect in newly
-opened Explorer windows. Windows already open when the mod is enabled
-or updated may remain unchanged. FX supports folders on local fixed drives only.
-Network locations (UNC paths, mapped drives, and standard folders redirected to
-a share) and removable or optical drives are not supported: such entries stay
-saved in Settings but may be missing from FX.
-Right-click **FX** for currently accessible drives with volume labels, plus
-**Save layout diagnostics**; network drives are not listed, and removable or
-optical drives may be missing. The drive list updates each time the menu opens.
+absolute, and `%NAME%` environment variables are expanded. Local, network
+(UNC or mapped drive) and removable-drive folders all work. A folder missing
+from a local disk is hidden from FX until it exists again. Like bookmarks,
+network and removable entries are shown without being checked; if one is
+unavailable, Explorer reports it when you click it. New settings take effect in
+newly opened Explorer windows. Windows already open when the mod is enabled
+or updated may remain unchanged.
+Right-click **FX** for all drives with their labels, plus
+**Save layout diagnostics**. The drive list updates each time the menu opens.
 Ctrl+click a menu entry to open it in a new tab. The diagnostics command appends
 a geometry snapshot to
 `%TEMP%\explorer-folder-bookmarks-diagnostics.txt`.
@@ -83,9 +82,9 @@ mod and check the Windhawk log before trying it again.
         $description: Name shown for this folder in the FX menu. If blank, the folder's own name is used.
       - path: ''
         $name: Folder path
-        $description: Full path of the folder, for example C:\Projects or %USERPROFILE%\Pictures. It must be on a local fixed drive. Leave blank to skip this entry. Folders that do not exist are left out of the menu until they exist again; network and removable-drive paths are not supported and may be missing.
+        $description: Full path of the folder, for example C:\Projects, \\server\share\Docs or %USERPROFILE%\Pictures. Leave blank to skip this entry. A folder missing from a local disk is hidden until it exists again.
   $name: FX custom folders
-  $description: Adds your own folders to the menu of the FX button (on the upper row of the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of drives. Changes apply to Explorer windows opened after you save. Only local fixed drives are supported: folders on network locations (UNC paths, mapped drives) or on removable or optical drives may be missing from the menu, including the four standard folders if they are redirected there.
+  $description: Adds your own folders to the menu of the FX button (on the upper row of the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of all drives. Changes apply to Explorer windows opened after you save. Local, network and removable-drive folders all work. A folder missing from a local disk is hidden until it exists again; network and removable entries are always shown, and Explorer reports it if one is unavailable when you click it.
 */
 // ==/WindhawkModSettings==
 
@@ -337,163 +336,6 @@ size_t FixedButtons(const BarState& state) {
     return state.rowIndex == 0 ? 2 : 1;
 }
 
-struct NetworkProbeEntry {
-    std::wstring path;
-    FolderStatus status = FolderStatus::Unknown;
-    ULONGLONG checkedAt = 0;
-    bool queued = false;
-    bool checking = false;
-};
-
-struct NetworkProbeState {
-    std::mutex mutex;
-    std::vector<NetworkProbeEntry> entries;
-    HANDLE wake = nullptr;
-    HANDLE thread = nullptr;
-    bool stopping = false;
-};
-
-NetworkProbeState g_networkProbes;
-constexpr ULONGLONG kNetworkProbeLifetimeMs = 30000;
-constexpr size_t kMaxNetworkProbes = 64;
-
-DWORD WINAPI NetworkProbeThreadProc(void* context) {
-    auto* state = static_cast<NetworkProbeState*>(context);
-    HANDLE wake = state->wake;
-    while (WaitForSingleObject(wake, INFINITE) == WAIT_OBJECT_0) {
-        for (;;) {
-            std::wstring path;
-            bool stopRequested = false;
-            {
-                std::lock_guard lock(state->mutex);
-                stopRequested = state->stopping;
-                if (!stopRequested) {
-                    auto it = std::find_if(state->entries.begin(),
-                                           state->entries.end(),
-                                           [](const NetworkProbeEntry& entry) {
-                                               return entry.queued;
-                                           });
-                    if (it == state->entries.end()) {
-                        break;
-                    }
-                    it->queued = false;
-                    it->checking = true;
-                    path = it->path;
-                }
-            }
-            if (stopRequested) {
-                return 0;
-            }
-            DWORD attributes = GetFileAttributesW(path.c_str());
-            FolderStatus result = attributes != INVALID_FILE_ATTRIBUTES &&
-                                          (attributes & FILE_ATTRIBUTE_DIRECTORY)
-                                      ? FolderStatus::Available
-                                      : FolderStatus::Missing;
-            {
-                std::lock_guard lock(state->mutex);
-                auto it = std::find_if(state->entries.begin(),
-                                       state->entries.end(),
-                                       [&](const NetworkProbeEntry& entry) {
-                                           return SamePath(entry.path, path);
-                                       });
-                if (it != state->entries.end()) {
-                    it->status = result;
-                    it->checkedAt = GetTickCount64();
-                    it->checking = false;
-                }
-            }
-        }
-    }
-    return 0;
-}
-
-bool EnsureNetworkProbeWorker() {
-    std::lock_guard lock(g_networkProbes.mutex);
-    if (g_networkProbes.stopping || g_unloading) {
-        return false;
-    }
-    if (g_networkProbes.thread) {
-        return true;
-    }
-    HANDLE wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (!wake) {
-        return false;
-    }
-    g_networkProbes.wake = wake;
-    g_networkProbes.thread =
-        CreateThread(nullptr, 0, NetworkProbeThreadProc, &g_networkProbes,
-                     0, nullptr);
-    if (!g_networkProbes.thread) {
-        g_networkProbes.wake = nullptr;
-        CloseHandle(wake);
-        return false;
-    }
-    return true;
-}
-
-FolderStatus CheckFolderStatusInBackground(const std::wstring& path) {
-    if (!EnsureNetworkProbeWorker()) {
-        return FolderStatus::Unknown;
-    }
-    std::lock_guard lock(g_networkProbes.mutex);
-    ULONGLONG now = GetTickCount64();
-    auto& entries = g_networkProbes.entries;
-    auto it = std::find_if(entries.begin(), entries.end(),
-                           [&](const NetworkProbeEntry& entry) {
-                               return SamePath(entry.path, path);
-                           });
-    if (it != entries.end()) {
-        if (it->queued || it->checking) {
-            return FolderStatus::Unknown;
-        }
-        if (it->checkedAt && now - it->checkedAt < kNetworkProbeLifetimeMs) {
-            return it->status;
-        }
-    } else {
-        if (entries.size() >= kMaxNetworkProbes) {
-            auto reusable = std::find_if(entries.begin(), entries.end(),
-                                         [](const NetworkProbeEntry& entry) {
-                                             return !entry.queued &&
-                                                    !entry.checking;
-                                         });
-            if (reusable == entries.end()) {
-                return FolderStatus::Unknown;
-            }
-            *reusable = NetworkProbeEntry{path};
-            it = reusable;
-        } else {
-            entries.push_back(NetworkProbeEntry{path});
-            it = std::prev(entries.end());
-        }
-    }
-    it->queued = true;
-    SetEvent(g_networkProbes.wake);
-    return FolderStatus::Unknown;
-}
-
-void StopNetworkProbeWorker() {
-    HANDLE thread = nullptr;
-    HANDLE wake = nullptr;
-    {
-        std::lock_guard lock(g_networkProbes.mutex);
-        g_networkProbes.stopping = true;
-        if (g_networkProbes.wake) {
-            SetEvent(g_networkProbes.wake);
-        }
-        thread = std::exchange(g_networkProbes.thread, nullptr);
-        wake = std::exchange(g_networkProbes.wake, nullptr);
-    }
-    if (thread) {
-        while (WaitForSingleObject(thread, 100) == WAIT_TIMEOUT) {
-            CancelSynchronousIo(thread);
-        }
-        CloseHandle(thread);
-    }
-    if (wake) {
-        CloseHandle(wake);
-    }
-}
-
 std::wstring ReadStorageLocked(unsigned rowIndex) {
     std::vector<wchar_t> buffer(kMaxStorageChars + 1);
     size_t chars = Wh_GetStringValue(StorageKey(rowIndex), buffer.data(),
@@ -639,17 +481,6 @@ bool IsAbsoluteFolderPath(const std::wstring& path) {
            std::none_of(path.begin(), path.end(), [](wchar_t ch) {
                return ch < 32;
            });
-}
-
-bool IsFxNetworkPath(const std::wstring& path) {
-    if (path.size() >= 2 && path[0] == L'\\' && path[1] == L'\\') {
-        return true;
-    }
-    if (path.size() < 3 || path[1] != L':' || path[2] != L'\\') {
-        return false;
-    }
-    wchar_t root[] = {path[0], L':', L'\\', L'\0'};
-    return GetDriveTypeW(root) == DRIVE_REMOTE;
 }
 
 bool ValidateImportedFolders(const std::vector<std::wstring>& folders) {
@@ -968,16 +799,9 @@ std::vector<FxFolder> LoadFxCustomFolders() {
             Wh_Log(L"Skipping invalid FX folder setting at index %d", index);
             continue;
         }
-        if (IsFxNetworkPath(path)) {
-            continue;
-        }
-        // Keep saved shortcuts, but do not show targets that cannot currently
-        // resolve to a folder. The next bar refresh can restore them.
-        FolderStatus status = CheckFolderStatus(path);
-        if (status == FolderStatus::Unknown) {
-            status = CheckFolderStatusInBackground(path);
-        }
-        if (status != FolderStatus::Available) {
+        // Like bookmarks, only a folder known to be missing on a local fixed
+        // drive is hidden; network and removable paths are never probed.
+        if (CheckFolderStatus(path) == FolderStatus::Missing) {
             continue;
         }
         if (std::any_of(folders.begin(), folders.end(),
@@ -1268,7 +1092,7 @@ std::wstring BuildLayoutDiagnostics(const BarState& state) {
         << L"-" << time.wMonth << L"-" << time.wDay << L" "
         << time.wHour << L":" << time.wMinute << L":" << time.wSecond
         << L" ===\r\n";
-    out << L"mod=0.7.6-double-decker rows=2 process=" << GetCurrentProcessId()
+    out << L"mod=0.7.7-double-decker rows=2 process=" << GetCurrentProcessId()
         << L" thread=" << GetCurrentThreadId()
         << L" rowHeight=" << kRowHeight
         << L" rowOpticalLift=" << kRowOpticalLift
@@ -1848,7 +1672,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                               const std::wstring& label,
                               const std::wstring& path,
                               bool driveItem = false) {
-        if (path.empty() || IsFxNetworkPath(path)) {
+        if (path.empty()) {
             return;
         }
         muxc::MenuFlyoutItem item;
@@ -1948,14 +1772,9 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                 continue;
             }
             wchar_t drive[] = {static_cast<wchar_t>(L'A' + index), L':', L'\\', L'\0'};
-            if (GetDriveTypeW(drive) == DRIVE_REMOTE) {
-                continue;
-            }
-            FolderStatus status = CheckFolderStatus(drive);
-            if (status == FolderStatus::Unknown) {
-                status = CheckFolderStatusInBackground(drive);
-            }
-            if (status != FolderStatus::Available) {
+            // Only local fixed drives are probed; other drives are listed
+            // unchecked.
+            if (CheckFolderStatus(drive) == FolderStatus::Missing) {
                 continue;
             }
             appendLocation(menu, DriveMenuLabel(drive), drive, true);
@@ -2752,12 +2571,10 @@ void Wh_ModAfterInit() {
 
 void Wh_ModBeforeUninit() {
     g_unloading = true;
-    StopNetworkProbeWorker();
 }
 
 void Wh_ModUninit() {
     g_unloading = true;
-    StopNetworkProbeWorker();
     ForExplorerWindows(CleanupCurrentThread);
     CleanupCurrentThread();
 }
