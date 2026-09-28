@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.7.4
+// @version         0.7.5
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -72,7 +72,7 @@ visible, disable the mod and check the Windhawk log before trying it again.
         $name: Folder path
         $description: Absolute folder path on a local fixed drive; leave blank to omit this entry. Missing folders are hidden from FX. Network and removable-drive paths are not supported and may be missing. Environment variables such as %USERPROFILE% are supported.
   $name: FX custom folders
-  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. The five standard locations remain available while they are on a local fixed drive.
+  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. Only folders on local fixed drives are supported; network locations (UNC paths, mapped drives) and removable or optical drives are not supported and may be missing from FX. The five standard locations remain available while they are on a local fixed drive.
 */
 // ==/WindhawkModSettings==
 

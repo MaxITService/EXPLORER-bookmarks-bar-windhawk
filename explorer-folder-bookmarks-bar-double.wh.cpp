@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar (Double Decker)
 // @description     Adds two independent, scrollable bookmark rows below the Windows 11 File Explorer address bar.
-// @version         0.7.3
+// @version         0.7.4
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -85,7 +85,7 @@ mod and check the Windhawk log before trying it again.
         $name: Folder path
         $description: Absolute folder path on a local fixed drive; leave blank to omit this entry. Missing folders are hidden from FX. Network and removable-drive paths are not supported and may be missing. Environment variables such as %USERPROFILE% are supported.
   $name: FX custom folders
-  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. The five standard locations remain available while they are on a local fixed drive.
+  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. Only folders on local fixed drives are supported; network locations (UNC paths, mapped drives) and removable or optical drives are not supported and may be missing from FX. The five standard locations remain available while they are on a local fixed drive.
 */
 // ==/WindhawkModSettings==
 
@@ -1268,7 +1268,7 @@ std::wstring BuildLayoutDiagnostics(const BarState& state) {
         << L"-" << time.wMonth << L"-" << time.wDay << L" "
         << time.wHour << L":" << time.wMinute << L":" << time.wSecond
         << L" ===\r\n";
-    out << L"mod=0.7.3-double-decker rows=2 process=" << GetCurrentProcessId()
+    out << L"mod=0.7.4-double-decker rows=2 process=" << GetCurrentProcessId()
         << L" thread=" << GetCurrentThreadId()
         << L" rowHeight=" << kRowHeight
         << L" rowOpticalLift=" << kRowOpticalLift
