@@ -41,11 +41,13 @@ in **Settings → FX custom folders**; blank entries are ignored. Paths must be
 absolute, and `%NAME%` environment variables are expanded. Unavailable folders
 are hidden from FX until they exist again. New settings take effect in newly
 opened Explorer windows. Windows already open when the mod is enabled
-or updated may remain unchanged. UNC paths and mapped network drives stay saved
-in Settings but are not shown in FX.
-Right-click **FX** for currently accessible non-network drives with volume
-labels, plus **Save layout diagnostics**. The drive list updates each time the
-menu opens.
+or updated may remain unchanged. FX supports folders on local fixed drives only.
+Network locations (UNC paths, mapped drives, and standard folders redirected to
+a share) and removable or optical drives are not supported: such entries stay
+saved in Settings but may be missing from FX.
+Right-click **FX** for currently accessible drives with volume labels, plus
+**Save layout diagnostics**; network drives are not listed, and removable or
+optical drives may be missing. The drive list updates each time the menu opens.
 Ctrl+click a menu entry to open it in a new tab. The diagnostics command appends
 a geometry snapshot to
 `%TEMP%\explorer-folder-bookmarks-diagnostics.txt`.
@@ -81,9 +83,9 @@ mod and check the Windhawk log before trying it again.
         $description: Optional text shown in the left-click FX menu; the folder name is used if blank.
       - path: ''
         $name: Folder path
-        $description: Absolute folder path; leave blank to omit this entry. Missing and network folders are hidden from FX. Environment variables such as %USERPROFILE% are supported.
+        $description: Absolute folder path on a local fixed drive; leave blank to omit this entry. Missing folders are hidden from FX. Network and removable-drive paths are not supported and may be missing. Environment variables such as %USERPROFILE% are supported.
   $name: FX custom folders
-  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored and the five standard locations remain available.
+  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. The five standard locations remain available while they are on a local fixed drive.
 */
 // ==/WindhawkModSettings==
 
