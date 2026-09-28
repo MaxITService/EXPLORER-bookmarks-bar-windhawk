@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.7.2
+// @version         0.7.3
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -194,8 +194,10 @@ struct BarState {
     winrt::event_token stripLoadedToken{};
     std::vector<std::function<void()>> panelHandlers;
     std::vector<std::function<void()>> driveHandlers;
-    winrt::weak_ref<muxc::RowDefinition> addedRow;
-    winrt::weak_ref<muxc::RowDefinition> commandRow;
+    // Keep row definitions strong: they are not UIElements, and XAML can
+    // discard an unreferenced wrapper so a weak reference no longer resolves.
+    muxc::RowDefinition addedRow{nullptr};
+    muxc::RowDefinition commandRow{nullptr};
     mux::GridLength oldCommandRowHeight{1.0, mux::GridUnitType::Star};
     bool createdFirstRow = false;
     double oldGridMinHeight = 0;
@@ -1334,8 +1336,8 @@ void SetBarRowCount(BarState& state, unsigned count) {
         return;
     }
     const double height = RowAllocation(count);
-    if (auto addedRow = state.addedRow.get()) {
-        addedRow.Height(
+    if (state.addedRow) {
+        state.addedRow.Height(
             mux::GridLength{height, mux::GridUnitType::Pixel});
     }
     auto strip = state.strip.get();
@@ -2143,9 +2145,8 @@ void RemoveBarVisuals(BarState& state) {
             }
         }
         auto rows = grid.RowDefinitions();
-        if (auto addedRow = state.addedRow.get();
-            addedRow && rows.Size() &&
-            rows.GetAt(rows.Size() - 1) == addedRow) {
+        if (state.addedRow && rows.Size() &&
+            rows.GetAt(rows.Size() - 1) == state.addedRow) {
             rows.RemoveAt(rows.Size() - 1);
         }
         if (state.createdFirstRow && rows.Size() == 1) {
@@ -2164,12 +2165,11 @@ void RemoveBarVisuals(BarState& state) {
     }
     if (auto host = state.hostGrid.get()) {
         auto rows = host.RowDefinitions();
-        if (auto commandRow = state.commandRow.get();
-            commandRow && rows.Size() == 3 &&
-            rows.GetAt(2) == commandRow &&
-            commandRow.Height().GridUnitType ==
+        if (state.commandRow && rows.Size() == 3 &&
+            rows.GetAt(2) == state.commandRow &&
+            state.commandRow.Height().GridUnitType ==
                 mux::GridUnitType::Auto) {
-            commandRow.Height(state.oldCommandRowHeight);
+            state.commandRow.Height(state.oldCommandRowHeight);
         }
         host.InvalidateMeasure();
     }
@@ -2181,8 +2181,8 @@ void RemoveBarVisuals(BarState& state) {
     state.stripPointerToken = {};
     state.stripSizeToken = {};
     state.stripLoadedToken = {};
-    state.addedRow = {};
-    state.commandRow = {};
+    state.addedRow = nullptr;
+    state.commandRow = nullptr;
     state.createdFirstRow = false;
     state.originalGridHeight = 0;
     state.originalNavHeight = 0;
@@ -2231,10 +2231,8 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
             return;
         }
     }
-    if (state->addedRow.get() || state->strip.get() ||
-        state->hostGrid.get() || state->navControl.get()) {
+    if (state->addedRow || state->strip.get()) {
         // Explorer rebuilt its navigation bar; undo the stale installation.
-        // The host can outlive the grid and still hold the Auto command row.
         RemoveBarVisuals(*state);
     }
 
@@ -2270,15 +2268,14 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
     }
     unsigned rowIndex = rows.Size();
     state->hostGrid = winrt::make_weak(host);
-    state->addedRow = winrt::make_weak(row);
+    state->addedRow = row;
     rows.Append(row);
 
     // Otherwise the two equal star rows each consume half of the extra host
     // height. Auto keeps Explorer's command row at its natural 48 units.
-    auto commandRow = hostRows.GetAt(2);
-    state->commandRow = winrt::make_weak(commandRow);
-    state->oldCommandRowHeight = commandRow.Height();
-    commandRow.Height(
+    state->commandRow = hostRows.GetAt(2);
+    state->oldCommandRowHeight = state->commandRow.Height();
+    state->commandRow.Height(
         mux::GridLength{1.0, mux::GridUnitType::Auto});
 
     muxc::StackPanel buttons;
@@ -2399,10 +2396,14 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
             if (!bar || bar.IsLoaded()) {
                 return;
             }
-            bool removed = false;
             for (auto& state : g_bars) {
                 if (state.commandBar.get() == bar) {
-                    removed = !!state.strip.get();
+                    // Another tab's command bar can share a header that stays
+                    // on screen; keep the bar there instead of removing it.
+                    if (auto strip = state.strip.get();
+                        strip && strip.IsLoaded()) {
+                        break;
+                    }
                     try {
                         RemoveBarVisuals(state);
                     } catch (...) {
@@ -2410,20 +2411,6 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
                                winrt::to_hresult().value);
                     }
                     break;
-                }
-            }
-            // Another tab's command bar can share this header and will not
-            // receive Loaded again, so offer it the freed row.
-            if (removed) {
-                std::vector<muxc::CommandBar> others;
-                for (const auto& state : g_bars) {
-                    if (auto other = state.commandBar.get();
-                        other && other != bar && other.IsLoaded()) {
-                        others.push_back(other);
-                    }
-                }
-                for (const auto& other : others) {
-                    TryInstallBar(other);
                 }
             }
             if (std::none_of(g_bars.begin(), g_bars.end(),
