@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.7.5
+// @version         0.7.6
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -67,12 +67,12 @@ visible, disable the mod and check the Windhawk log before trying it again.
 - fxCustomFolders:
     - - label: ''
         $name: Menu label
-        $description: Optional text shown in the left-click FX menu; the folder name is used if blank.
+        $description: Name shown for this folder in the FX menu. If blank, the folder's own name is used.
       - path: ''
         $name: Folder path
-        $description: Absolute folder path on a local fixed drive; leave blank to omit this entry. Missing folders are hidden from FX. Network and removable-drive paths are not supported and may be missing. Environment variables such as %USERPROFILE% are supported.
+        $description: Full path of the folder, for example C:\Projects or %USERPROFILE%\Pictures. It must be on a local fixed drive. Leave blank to skip this entry. Folders that do not exist are left out of the menu until they exist again; network and removable-drive paths are not supported and may be missing.
   $name: FX custom folders
-  $description: Extra folders in the left-click FX menu. Add or edit entries here; blank paths are ignored. Only folders on local fixed drives are supported; network locations (UNC paths, mapped drives) and removable or optical drives are not supported and may be missing from FX. The five standard locations remain available while they are on a local fixed drive.
+  $description: Adds your own folders to the FX button's menu. FX is the second button on the bookmarks bar, right after +. Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents, Downloads and Temp; below a separator come the folders from this list, in the same order (up to 24). Click a menu entry to open that folder in the current tab, or Ctrl+click it to open a new tab. Right-click FX for a list of drives instead. Changes apply to Explorer windows opened after you save. Only folders on local fixed drives are supported; network locations (UNC paths, mapped drives) and removable or optical drives are not supported and may be missing from FX, even for the five standard folders.
 */
 // ==/WindhawkModSettings==
 
