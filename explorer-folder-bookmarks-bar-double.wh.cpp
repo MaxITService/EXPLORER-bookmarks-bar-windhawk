@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar (Double Decker)
 // @description     Adds two independent, scrollable bookmark rows below the Windows 11 File Explorer address bar.
-// @version         0.7.2
+// @version         0.7.3
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -1268,7 +1268,7 @@ std::wstring BuildLayoutDiagnostics(const BarState& state) {
         << L"-" << time.wMonth << L"-" << time.wDay << L" "
         << time.wHour << L":" << time.wMinute << L":" << time.wSecond
         << L" ===\r\n";
-    out << L"mod=0.7.2-double-decker rows=2 process=" << GetCurrentProcessId()
+    out << L"mod=0.7.3-double-decker rows=2 process=" << GetCurrentProcessId()
         << L" thread=" << GetCurrentThreadId()
         << L" rowHeight=" << kRowHeight
         << L" rowOpticalLift=" << kRowOpticalLift

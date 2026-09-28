@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.7.3
+// @version         0.7.4
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe

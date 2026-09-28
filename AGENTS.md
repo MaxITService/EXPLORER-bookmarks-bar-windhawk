@@ -3,7 +3,7 @@
 ## Sources
 
 - Read [DECISIONS.md](DECISIONS.md) before changing layout. The production layout derives from the user-confirmed 0.4.7 geometry; measurements are in `diagnostics/layout.md`.
-- Find the repository root with `git rev-parse --show-toplevel`. Only two mod sources belong in this repository: `mods/explorer-folder-bookmarks-bar.wh.cpp` (production, untested 0.7.3 candidate; based on the user-confirmed 0.7.1 build) and the untested Double Decker candidate `explorer-folder-bookmarks-bar-double.wh.cpp` (0.7.2). Repository FX changes after the installed 0.7.1 build still require installation and Explorer verification.
+- Find the repository root with `git rev-parse --show-toplevel`. Only two mod sources belong in this repository: `mods/explorer-folder-bookmarks-bar.wh.cpp` (production, 0.7.4; the user confirmed the 0.7.3 build, and 0.7.4 changes only README and settings text) and the untested Double Decker candidate `explorer-folder-bookmarks-bar-double.wh.cpp` (0.7.3). Bump `@version` in every source you edit, including text-only edits.
 - All variants use the same mod ID and must be compiled one at a time. Windhawk's editor copy under `C:\ProgramData\Windhawk\EditorWorkspace\` is separate from the repository source.
 
 ## Working rules
