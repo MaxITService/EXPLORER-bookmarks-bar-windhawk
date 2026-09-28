@@ -24,8 +24,8 @@ the bar. This is the supported activation path for stability.
 
 - Click **+** to bookmark the active filesystem folder. Click a bookmark to navigate there; Ctrl+click opens it in a new tab.
 - Drag bookmarks to reorder them. Middle-click removes a bookmark from the bar without deleting its folder. Hover to see its full path. Icons come from Windows Shell.
-- Left-click **FX** for your profile folder, Desktop, Documents, Downloads, Temp, and custom folders. Right-click **FX** for accessible non-network drives. UNC paths and folders on mapped network drives are not shown in either FX menu. Ctrl+click a menu item to open it in a new tab.
-- Set **FX custom folders** in the mod's Windhawk settings. The blank default entry adds no shortcut; enter an absolute path and optional label. Environment variables are supported. Saved paths remain in Settings, but missing and network folders are hidden from FX. Open a new Explorer window after changing settings.
+- Left-click **FX** for your profile folder, Desktop, Documents, Downloads, and custom folders. Right-click **FX** for accessible drives. Ctrl+click a menu item to open it in a new tab.
+- Set **FX custom folders** in the mod's Windhawk settings. The blank default entry adds no shortcut; enter an absolute path and optional label. Environment variables are supported. FX supports folders on local fixed drives only: network locations and removable or optical drives are not supported and may be missing from FX. Saved paths remain in Settings. Open a new Explorer window after changing settings.
 - Right-click **+** to save or load a bookmark backup using a file dialog. Bookmarks also persist in Windhawk's local mod storage.
 
 Licensed under [MIT](LICENSE).

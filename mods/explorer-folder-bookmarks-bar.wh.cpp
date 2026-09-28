@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.7.6
+// @version         0.7.7
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -31,7 +31,7 @@ is the supported way to activate the bar without relying on live window updates.
 The bar expands from one to four rows as the window narrows. If bookmarks
 still exceed the fourth row, the bar can pan sideways.
 Left-click **FX**, next to **+**, for the profile (**~**), Desktop, Documents,
-Downloads, Temp, and the custom folders listed in this mod's Windhawk settings.
+Downloads, and the custom folders listed in this mod's Windhawk settings.
 Custom shortcuts are empty by default. Add a folder path and optional label in
 **Settings → FX custom folders**; blank entries are ignored. Paths must be
 absolute, and `%NAME%` environment variables are expanded. Unavailable folders
@@ -72,7 +72,7 @@ visible, disable the mod and check the Windhawk log before trying it again.
         $name: Folder path
         $description: Full path of the folder, for example C:\Projects or %USERPROFILE%\Pictures. It must be on a local fixed drive. Leave blank to skip this entry. Folders that do not exist are left out of the menu until they exist again; network and removable-drive paths are not supported and may be missing.
   $name: FX custom folders
-  $description: Adds your own folders to the FX button's menu. FX is the second button on the bookmarks bar, right after +. Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents, Downloads and Temp; below a separator come the folders from this list, in the same order (up to 24). Click a menu entry to open that folder in the current tab, or Ctrl+click it to open a new tab. Right-click FX for a list of drives instead. Changes apply to Explorer windows opened after you save. Only folders on local fixed drives are supported; network locations (UNC paths, mapped drives) and removable or optical drives are not supported and may be missing from FX, even for the five standard folders.
+  $description: Adds your own folders to the menu of the FX button (the second button on the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of drives. Changes apply to Explorer windows opened after you save. Only local fixed drives are supported: folders on network locations (UNC paths, mapped drives) or on removable or optical drives may be missing from the menu, including the four standard folders if they are redirected there.
 */
 // ==/WindhawkModSettings==
 
@@ -569,26 +569,6 @@ std::wstring KnownFolderPath(REFKNOWNFOLDERID folderId) {
     std::wstring path(value);
     CoTaskMemFree(value);
     return NormalizePath(std::move(path));
-}
-
-std::wstring TempFolderPath() {
-    std::vector<wchar_t> buffer(MAX_PATH + 1);
-    DWORD length = GetTempPathW(static_cast<DWORD>(buffer.size()),
-                                buffer.data());
-    if (length >= buffer.size()) {
-        buffer.resize(static_cast<size_t>(length) + 1);
-        length = GetTempPathW(static_cast<DWORD>(buffer.size()),
-                              buffer.data());
-    }
-    if (length == 0 || length >= buffer.size()) {
-        return {};
-    }
-    auto path = NormalizePath(buffer.data());
-    DWORD attributes = GetFileAttributesW(path.c_str());
-    return attributes != INVALID_FILE_ATTRIBUTES &&
-                   (attributes & FILE_ATTRIBUTE_DIRECTORY)
-                ? path
-                : std::wstring{};
 }
 
 std::wstring DriveMenuLabel(const std::wstring& root) {
@@ -1870,7 +1850,6 @@ void RefreshPanel(const muxc::StackPanel& panel) {
     appendLocation(foldersMenu, L"Desktop", KnownFolderPath(FOLDERID_Desktop));
     appendLocation(foldersMenu, L"Documents", KnownFolderPath(FOLDERID_Documents));
     appendLocation(foldersMenu, L"Downloads", KnownFolderPath(FOLDERID_Downloads));
-    appendLocation(foldersMenu, L"Temp", TempFolderPath());
     const auto customFolders = LoadFxCustomFolders();
     if (!customFolders.empty()) {
         foldersMenu.Items().Append(muxc::MenuFlyoutSeparator{});
