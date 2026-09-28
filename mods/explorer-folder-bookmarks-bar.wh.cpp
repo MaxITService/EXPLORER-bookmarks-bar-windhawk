@@ -2231,8 +2231,10 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
             return;
         }
     }
-    if (state->addedRow.get() || state->strip.get()) {
+    if (state->addedRow.get() || state->strip.get() ||
+        state->hostGrid.get() || state->navControl.get()) {
         // Explorer rebuilt its navigation bar; undo the stale installation.
+        // The host can outlive the grid and still hold the Auto command row.
         RemoveBarVisuals(*state);
     }
 
@@ -2391,24 +2393,44 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
     });
     state.unloadedToken = commandBar.Unloaded(
         [weakBar](auto const&, auto const&) {
-            if (auto bar = weakBar.get()) {
-                for (auto& state : g_bars) {
-                    if (state.commandBar.get() == bar) {
-                        try {
-                            RemoveBarVisuals(state);
-                        } catch (...) {
-                            Wh_Log(L"Bookmarks bar unload cleanup failed: %08X",
-                                   winrt::to_hresult().value);
-                        }
-                        break;
+            auto bar = weakBar.get();
+            // WinUI can raise Unloaded after a quick re-add has already raised
+            // Loaded; keep the bar while its command bar is in the tree.
+            if (!bar || bar.IsLoaded()) {
+                return;
+            }
+            bool removed = false;
+            for (auto& state : g_bars) {
+                if (state.commandBar.get() == bar) {
+                    removed = !!state.strip.get();
+                    try {
+                        RemoveBarVisuals(state);
+                    } catch (...) {
+                        Wh_Log(L"Bookmarks bar unload cleanup failed: %08X",
+                               winrt::to_hresult().value);
+                    }
+                    break;
+                }
+            }
+            // Another tab's command bar can share this header and will not
+            // receive Loaded again, so offer it the freed row.
+            if (removed) {
+                std::vector<muxc::CommandBar> others;
+                for (const auto& state : g_bars) {
+                    if (auto other = state.commandBar.get();
+                        other && other != bar && other.IsLoaded()) {
+                        others.push_back(other);
                     }
                 }
-                if (std::none_of(g_bars.begin(), g_bars.end(),
-                                 [](const BarState& state) {
-                                     return !!state.strip.get();
-                                 })) {
-                    g_iconCache.clear();
+                for (const auto& other : others) {
+                    TryInstallBar(other);
                 }
+            }
+            if (std::none_of(g_bars.begin(), g_bars.end(),
+                             [](const BarState& state) {
+                                 return !!state.strip.get();
+                             })) {
+                g_iconCache.clear();
             }
         });
     TryInstallBar(commandBar);
