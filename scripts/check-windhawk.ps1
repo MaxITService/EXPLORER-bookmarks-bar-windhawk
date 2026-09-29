@@ -101,7 +101,7 @@ try {
         '-shared', '-O2', '-DWH_MOD', '-DWH_EDITING', '-I', $include,
         $sourcePath, '-o', $testDll, '-Wl,--export-all-symbols',
         '-lole32', '-loleaut32', '-lshell32', '-luuid',
-        '-lruntimeobject', '-lwindowscodecs'
+        '-lruntimeobject', '-lwindowscodecs', '-lcomctl32'
     )
     & $compiler @linkArgs
     if ($LASTEXITCODE -ne 0) { throw 'Standalone test DLL build failed' }
