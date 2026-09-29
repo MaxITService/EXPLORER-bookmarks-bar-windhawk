@@ -1,11 +1,11 @@
 // ==WindhawkMod==
 // @id              explorer-folder-bookmarks-bar
-// @name            Explorer Folder Bookmarks Bar
-// @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.8.10
+// @name            Explorer Folder Bookmarks Bar (personal build)
+// @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows, and optionally recent folders to Open and Save dialogs of all programs.
+// @version         0.8.5
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
-// @include         explorer.exe
+// @include         *
 // @architecture    x86-64
 // @compilerOptions -lole32 -loleaut32 -lshell32 -luuid -lruntimeobject -lwindowscodecs
 // @license         MIT
@@ -22,12 +22,11 @@ folders selected in the file list, Ctrl+B bookmarks all of them, or removes
 them when all are bookmarked already. You can also drag one or more folders
 from File Explorer onto the bar; they are inserted where you drop them. For
 safety, one Ctrl+B or drop handles at most 20 folders; the rest are ignored.
-When bookmarks cannot be added because the list is full (32 folders), or the
-folder is already bookmarked, a short notice appears below the bar.
-Click a bookmark to navigate the active tab to it. Ctrl+click asks Explorer to
-open it in a new tab; right-click opens it in a new window. Drag a bookmark
-onto another to reorder the row. Middle-click a bookmark to remove it from the
-bar. Removing a bookmark never deletes its target folder.
+Click a
+bookmark to navigate the active tab to it. Ctrl+click asks Explorer to open it
+in a new tab; right-click opens it in a new window. Drag a bookmark onto another to reorder the row. Middle-click a
+bookmark to remove it from the bar. Removing a bookmark never deletes its
+target folder.
 
 ![Explorer Folder Bookmarks Bar in File Explorer](https://raw.githubusercontent.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/main/Promo/How-it-works.gif)
 
@@ -55,23 +54,27 @@ open a file dialog so you can choose the JSON backup. The profile folder is
 suggested initially. Loading replaces the current list only after the entire
 UTF-8 JSON file passes validation.
 
-Turn on **Recent folders → Show recent folders** in settings to show up to
-three recently opened folders at the right end of the bar, after a **|**
-separator. The newest folder
+Turn on **Recent folders** in settings to show up to three recently opened
+folders at the right end of the bar, after a **|** separator. The newest folder
 is nearest the right edge, where **RC** sits. Left-click **RC** for the
 remembered folders that have no button, up to ten in total, and to choose
-the source: folders you open in File Explorer, or Windows recent items, which
-are read only from the Recent folder when it is on a local fixed drive. If
+the source: folders you open in File Explorer, or Windows recent items. If
 Windows is set not to keep recent items, RC says so. Right-click **RC** to
 clear the list; clearing Windows recent items only hides them from the bar and
 never deletes Windows data. Middle-click a recent folder to remove it, or
 drag it onto the bookmarks to keep it. Bookmarked folders and folders missing
-from a local disk are never listed as recent. When the window is too narrow, the
-recent buttons fold into RC; without RC, the oldest buttons are hidden first.
+from a local disk are never listed as recent. When the window is too narrow,
+the recent buttons fold into RC; without RC, the oldest buttons are hidden first.
 Folders you open in File Explorer are remembered in this mod's Windhawk local
-storage (up to 64 paths) and stay there after recent folders are turned off. To
+storage (up to 64 paths) and stay there after Recent folders is turned off. To
 erase them, choose *Folders opened in File Explorer* in the RC menu and clear
 the list with a right-click on RC.
+
+This personal build loads into every process. With **Recent folders in file
+dialogs** on, Open and Save dialogs that programs create through COM list the
+same recent folders at the top of their navigation pane. Programs that use a
+different picker, such as Store apps, are not changed. It is not intended for
+the Windhawk catalog.
 
 The bookmark list lives in this mod's Windhawk local storage. This version
 supports up to 32 folders and uses the folder name as the button label. Icons
@@ -100,29 +103,24 @@ visible, disable the mod and check the Windhawk log before trying it again.
 - bookmarkHotkey: true
   $name: Ctrl+B bookmarks the current or selected folders
   $description: Press Ctrl+B in File Explorer to bookmark the current folder, or to remove its bookmark when it already has one. With folders selected in the file list, Ctrl+B bookmarks all of them, or removes them when all are bookmarked already; at most 20 folders are handled at a time. Ctrl+B is ignored while you type in the address bar, the search box or a rename field.
-- recent:
-  - enabled: false
-    $name: Show recent folders
-    $description: Turns recent folders and RC on. The other settings in this group apply only while this is on. While it is off, opened folders are not recorded; folders already remembered stay in the mod's local storage (up to 64) until you clear the list with RC.
-  - buttons: 3
-    $name: Buttons
-    $description: How many recent folders appear as buttons, from 1 to 3. When the window is too narrow, the buttons fold into RC; with RC hidden, the oldest buttons are hidden first.
-    #! $min: 1
-    #! $max: 3
-  - history: 10
-    $name: Remembered folders
-    $description: How many recent folders the buttons and the RC menu list together, from 1 to 10. It is never less than the number of buttons.
-    #! $min: 1
-    #! $max: 10
-  - rcButton: menu
-    $name: RC button
-    $description: RC sits at the right edge. Left-click it for remembered folders that have no button and to choose the source, folders opened in File Explorer or Windows recent items, which are read only from the Recent folder on a local fixed drive. Right-click it to clear the list. A hidden RC still appears while no recent folder is available, so the source can be changed.
-    $options:
-    - menu: Shown, right-click offers Clear
-    - clear: Shown, right-click clears at once
-    - hidden: Hidden
+- recentFolders: false
   $name: Recent folders
-  $description: Recently opened folders at the right end of the bar, after a | separator, with the newest nearest the right edge. Click one to open it; Ctrl+click opens a new tab and right-click a new window. Middle-click removes it from the recent list; drag it onto the bookmarks to keep it. Bookmarked folders are never listed.
+  $description: Shows recently opened folders at the right end of the bar, after a | separator, with the newest nearest the right edge. Click one to open it; Ctrl+click opens a new tab and right-click a new window. Middle-click removes it from the recent list. Drag it onto the bookmarks to keep it. Bookmarked folders are never listed. Left-click RC to choose between folders opened in File Explorer and Windows recent items. Folders opened in File Explorer are remembered in the mod's local storage (up to 64) until you clear the list.
+- recentButtons: 3
+  $name: Recent folder buttons
+  $description: How many recent folders appear as buttons, from 1 to 3. When the window is too narrow, the buttons fold into RC; without RC, the oldest buttons are hidden first.
+- recentMenuButton: true
+  $name: RC button
+  $description: Shows RC at the right edge. Left-click it for remembered folders that have no button and to choose the source; right-click it to clear the list. RC also appears while no recent folder is available.
+- recentHistory: 10
+  $name: Remembered recent folders
+  $description: How many recent folders the buttons and the RC menu list together, from 1 to 10. It is never less than the number of buttons.
+- recentRightClickClears: false
+  $name: Right-click RC clears instantly
+  $description: When on, right-clicking RC clears the recent list at once instead of showing a Clear command.
+- recentInFileDialogs: false
+  $name: Recent folders in file dialogs
+  $description: Adds the recent folders to the top of the navigation pane in Open and Save dialogs of all programs. Requires Recent folders. Applies to dialogs opened after you save.
 */
 // ==/WindhawkModSettings==
 
@@ -169,7 +167,6 @@ visible, disable the mod and check the Windhawk log before trying it again.
 #include <functional>
 #include <iterator>
 #include <list>
-#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -179,7 +176,6 @@ visible, disable the mod and check the Windhawk log before trying it again.
 namespace mux = winrt::Microsoft::UI::Xaml;
 namespace muxc = winrt::Microsoft::UI::Xaml::Controls;
 namespace muxi = winrt::Microsoft::UI::Xaml::Input;
-namespace muxp = winrt::Microsoft::UI::Xaml::Controls::Primitives;
 namespace muxm = winrt::Microsoft::UI::Xaml::Media;
 namespace muxmi = winrt::Microsoft::UI::Xaml::Media::Imaging;
 namespace wjson = winrt::Windows::Data::Json;
@@ -189,11 +185,6 @@ constexpr size_t kMaxStorageChars = 30000;
 constexpr size_t kMaxBookmarks = 32;
 // A single Ctrl+B or drop handles at most this many folders.
 constexpr size_t kMaxFoldersPerAction = 20;
-// Ctrl+B with a huge selection must not stall the UI thread: only the first
-// kMaxSelectionScanned selected items are examined.
-constexpr DWORD kMaxSelectionScanned = 1000;
-// How long the notice below the bar stays visible.
-constexpr UINT kNoticeMs = 2500;
 constexpr DWORD kMaxImportBytes = 262144;
 constexpr wchar_t kExportFileName[] = L"explorer-folder-bookmarks.json";
 constexpr size_t kMaxCustomFxFolders = 24;
@@ -226,12 +217,7 @@ constexpr wchar_t kWindowsRecentHiddenKey[] = L"windowsRecentHidden";
 constexpr size_t kMaxStoredRecents = 64;
 constexpr int kMaxRecentButtons = 3;
 constexpr int kMaxRecentHistory = 10;
-// The Windows source is scanned on the UI thread, so keep each scan small:
-// the newest links only. Bookmarked folders are removed after the scan, so
-// collect room for every bookmark plus a full list of kMaxRecentHistory.
-constexpr size_t kMaxRecentLinksScanned = 128;
-constexpr size_t kMaxWindowsRecentFolders =
-    kMaxBookmarks + static_cast<size_t>(kMaxRecentHistory);
+constexpr size_t kMaxRecentLinksScanned = 256;
 constexpr ULONGLONG kWindowsRecentCacheMs = 5000;
 
 constexpr double RowAllocation(unsigned rows) {
@@ -342,19 +328,12 @@ struct BarState {
     winrt::weak_ref<muxc::Button> dropTarget;
     mux::Thickness dropOldThickness{};
     bool dropAfter = false;
-    // The short notice below the bar, created when first needed.
-    muxc::Flyout notice{nullptr};
-    muxc::TextBlock noticeText{nullptr};
 };
 
 // XAML objects must only be touched by their owning UI thread.
 // Stable addresses matter while XAML layout callbacks run and new Explorer
 // tabs can register another command bar on the same UI thread.
-// The rows and other XAML references are released explicitly on their UI
-// thread in RemoveBarVisuals and CleanupCurrentThread; do not release them
-// from TLS destruction after Explorer's XAML teardown.
-[[clang::no_destroy]] thread_local std::optional<std::list<BarState>> g_bars{
-    std::in_place};
+thread_local std::list<BarState> g_bars;
 // Explorer's XAML window and its size hook run on the same UI thread. Use the
 // largest active bar on that thread so another tab cannot be clipped.
 thread_local unsigned g_frameRows = 0;
@@ -372,24 +351,10 @@ void RevokeHandlers(std::vector<std::function<void()>>& handlers) {
     }
 }
 
-// An exception must not leave a XAML delegate: XAML would see a failed
-// HRESULT from an event handler. Log it and let the bar keep working.
-template <typename Handler>
-auto GuardHandler(const wchar_t* name, Handler handler) {
-    return [name, handler = std::move(handler)](auto&&... args) {
-        try {
-            handler(std::forward<decltype(args)>(args)...);
-        } catch (...) {
-            Wh_Log(L"%ls failed: %08X", name, winrt::to_hresult().value);
-        }
-    };
-}
-
 template <typename Element, typename Handler>
 void TrackClick(std::vector<std::function<void()>>& handlers,
                 const Element& element, Handler&& handler) {
-    auto token = element.Click(
-        GuardHandler(L"Click handler", std::forward<Handler>(handler)));
+    auto token = element.Click(std::forward<Handler>(handler));
     auto weak = winrt::make_weak(element);
     handlers.emplace_back([weak, token] {
         if (auto current = weak.get()) {
@@ -401,8 +366,7 @@ void TrackClick(std::vector<std::function<void()>>& handlers,
 template <typename Element, typename Handler>
 void TrackContextRequested(std::vector<std::function<void()>>& handlers,
                            const Element& element, Handler&& handler) {
-    auto token = element.ContextRequested(GuardHandler(
-        L"ContextRequested handler", std::forward<Handler>(handler)));
+    auto token = element.ContextRequested(std::forward<Handler>(handler));
     auto weak = winrt::make_weak(element);
     handlers.emplace_back([weak, token] {
         if (auto current = weak.get()) {
@@ -414,8 +378,7 @@ void TrackContextRequested(std::vector<std::function<void()>>& handlers,
 template <typename Handler>
 void TrackOpening(std::vector<std::function<void()>>& handlers,
                   const muxc::MenuFlyout& menu, Handler&& handler) {
-    auto token = menu.Opening(
-        GuardHandler(L"Opening handler", std::forward<Handler>(handler)));
+    auto token = menu.Opening(std::forward<Handler>(handler));
     auto weak = winrt::make_weak(menu);
     handlers.emplace_back([weak, token] {
         if (auto current = weak.get()) {
@@ -427,8 +390,7 @@ void TrackOpening(std::vector<std::function<void()>>& handlers,
 void TrackPointer(std::vector<std::function<void()>>& handlers,
                   const muxc::Button& button, const mux::RoutedEvent& event,
                   muxi::PointerEventHandler handler) {
-    auto boxed = winrt::box_value(muxi::PointerEventHandler{
-        GuardHandler(L"Pointer handler", std::move(handler))});
+    auto boxed = winrt::box_value(std::move(handler));
     button.AddHandler(event, boxed, true);
     auto weak = winrt::make_weak(button);
     handlers.emplace_back([weak, event, boxed] {
@@ -464,10 +426,7 @@ std::wstring NormalizePath(std::wstring path) {
 }
 
 bool SamePath(const std::wstring& a, const std::wstring& b) {
-    // Ordinal, case-insensitive for all of Unicode, independent of the locale.
-    return CompareStringOrdinal(a.c_str(), static_cast<int>(a.size()),
-                                b.c_str(), static_cast<int>(b.size()),
-                                TRUE) == CSTR_EQUAL;
+    return _wcsicmp(a.c_str(), b.c_str()) == 0;
 }
 
 enum class FolderStatus { Available, Missing, Unknown };
@@ -592,12 +551,9 @@ std::wstring SuggestedBackupPath() {
     return path + kExportFileName;
 }
 
-// Without KF_FLAG_DONT_VERIFY, Windows checks that the folder exists, which
-// can stall on a folder redirected to an unreachable share. Callers apply
-// CheckFolderStatus instead, which never probes network storage.
 std::wstring KnownFolderPath(REFKNOWNFOLDERID folderId) {
     PWSTR value = nullptr;
-    if (FAILED(SHGetKnownFolderPath(folderId, KF_FLAG_DONT_VERIFY, nullptr,
+    if (FAILED(SHGetKnownFolderPath(folderId, KF_FLAG_DEFAULT, nullptr,
                                     &value)) || !value) {
         return {};
     }
@@ -795,13 +751,6 @@ bool LoadBackup(const std::wstring& path) try {
                   &read, nullptr) || read != bytes.size()) {
         return false;
     }
-    // A backup saved with a UTF-8 byte order mark is still a valid backup.
-    if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xEF &&
-        static_cast<unsigned char>(bytes[1]) == 0xBB &&
-        static_cast<unsigned char>(bytes[2]) == 0xBF) {
-        bytes.erase(0, 3);
-        Wh_Log(L"Bookmark backup: skipped a UTF-8 byte order mark");
-    }
     std::wstring wide;
     if (!Utf8ToWide(bytes, wide)) {
         return false;
@@ -823,13 +772,9 @@ bool LoadBackup(const std::wstring& path) try {
             return false;
         }
         auto value = list.GetStringAt(i);
-        // Keep the full length: a JSON \u0000 escape yields an embedded NUL,
-        // which validation must see and reject instead of a shortened path.
-        folders.emplace_back(value.data(), value.size());
+        folders.emplace_back(value.c_str());
     }
     if (!ValidateImportedFolders(folders)) {
-        Wh_Log(L"Bookmark backup rejected: a folder path is invalid, "
-               L"duplicated or too long");
         return false;
     }
     std::lock_guard lock(g_storageMutex);
@@ -840,55 +785,20 @@ bool LoadBackup(const std::wstring& path) try {
     return false;
 }
 
-// What the user is told after adding bookmarks that could not all be added.
-enum class BookmarkNotice : unsigned {
-    None,
-    Full,
-    Partial,
-    AlreadyBookmarked,
-};
-
-// The outcome of adding folders to the bookmark list.
-struct BookmarkChange {
-    bool changed = false;
-    size_t added = 0;
-    // Folders left out because the list holds kMaxBookmarks already.
-    size_t noRoom = 0;
-    size_t existing = 0;
-    size_t invalid = 0;
-
-    BookmarkNotice Notice() const {
-        if (noRoom != 0) {
-            return added != 0 ? BookmarkNotice::Partial : BookmarkNotice::Full;
-        }
-        if (added == 0 && existing != 0 && invalid == 0) {
-            return BookmarkNotice::AlreadyBookmarked;
-        }
-        return BookmarkNotice::None;
-    }
-};
-
-BookmarkChange AddBookmark(std::wstring path) {
-    BookmarkChange change;
+bool AddBookmark(std::wstring path) {
     path = NormalizePath(std::move(path));
     if (path.empty() || path.find_first_of(L"\r\n") != std::wstring::npos) {
-        return change;
+        return false;
     }
     std::lock_guard lock(g_storageMutex);
     auto folders = SplitBookmarks(ReadStorageLocked());
-    if (std::any_of(folders.begin(), folders.end(),
+    if (folders.size() >= kMaxBookmarks ||
+        std::any_of(folders.begin(), folders.end(),
                     [&](const auto& old) { return SamePath(old, path); })) {
-        change.existing = 1;
-        return change;
-    }
-    if (folders.size() >= kMaxBookmarks) {
-        change.noRoom = 1;
-        return change;
+        return false;
     }
     folders.push_back(std::move(path));
-    change.changed = SaveBookmarksLocked(folders);
-    change.added = change.changed ? 1 : 0;
-    return change;
+    return SaveBookmarksLocked(folders);
 }
 
 bool RemoveBookmark(const std::wstring& path) {
@@ -926,61 +836,45 @@ bool MoveBookmarkToIndex(const std::wstring& source, size_t insertionIndex) {
 }
 
 // Inserts the paths that are not bookmarked yet, in their given order, while
-// room remains, and counts what was inserted and what was left out. The
-// caller saves when anything was added.
-BookmarkChange InsertMissingLocked(std::vector<std::wstring>& folders,
-                                   const std::vector<std::wstring>& paths,
-                                   size_t insertionIndex) {
+// room remains. Returns how many were inserted.
+size_t InsertMissingLocked(std::vector<std::wstring>& folders,
+                           const std::vector<std::wstring>& paths,
+                           size_t insertionIndex) {
     insertionIndex = std::min(insertionIndex, folders.size());
-    BookmarkChange change;
+    size_t added = 0;
     for (auto path : paths) {
         path = NormalizePath(std::move(path));
-        if (!IsAbsoluteFolderPath(path)) {
-            ++change.invalid;
-        } else if (std::any_of(folders.begin(), folders.end(),
-                               [&](const auto& old) {
-                                   return SamePath(old, path);
-                               })) {
-            ++change.existing;
-        } else if (folders.size() >= kMaxBookmarks) {
-            ++change.noRoom;
-        } else {
-            folders.insert(folders.begin() + insertionIndex + change.added,
-                           std::move(path));
-            ++change.added;
+        if (folders.size() >= kMaxBookmarks) {
+            break;
         }
+        if (!IsAbsoluteFolderPath(path) ||
+            std::any_of(folders.begin(), folders.end(),
+                        [&](const auto& old) { return SamePath(old, path); })) {
+            continue;
+        }
+        folders.insert(folders.begin() + insertionIndex + added,
+                       std::move(path));
+        ++added;
     }
-    return change;
-}
-
-// Saves what InsertMissingLocked inserted. A failed save leaves the stored
-// list unchanged, so nothing counts as added.
-BookmarkChange SaveInsertedLocked(const std::vector<std::wstring>& folders,
-                                  BookmarkChange change) {
-    change.changed = change.added != 0 && SaveBookmarksLocked(folders);
-    if (!change.changed) {
-        change.added = 0;
-    }
-    return change;
+    return added;
 }
 
 // insertionIndex past the end appends.
-BookmarkChange InsertBookmarks(const std::vector<std::wstring>& paths,
-                               size_t insertionIndex) {
+bool InsertBookmarks(const std::vector<std::wstring>& paths,
+                     size_t insertionIndex) {
     std::lock_guard lock(g_storageMutex);
     auto folders = SplitBookmarks(ReadStorageLocked());
-    auto change = InsertMissingLocked(folders, paths, insertionIndex);
-    return SaveInsertedLocked(folders, change);
+    return InsertMissingLocked(folders, paths, insertionIndex) != 0 &&
+           SaveBookmarksLocked(folders);
 }
 
-BookmarkChange InsertBookmarkAt(const std::wstring& path,
-                                size_t insertionIndex) {
+bool InsertBookmarkAt(const std::wstring& path, size_t insertionIndex) {
     return InsertBookmarks({path}, insertionIndex);
 }
 
 // Removes the paths when every one of them is bookmarked; otherwise appends
 // the missing ones.
-BookmarkChange ToggleBookmarks(const std::vector<std::wstring>& paths) {
+bool ToggleBookmarks(const std::vector<std::wstring>& paths) {
     std::vector<std::wstring> normalized;
     for (const auto& path : paths) {
         if (auto value = NormalizePath(path); !value.empty()) {
@@ -988,7 +882,7 @@ BookmarkChange ToggleBookmarks(const std::vector<std::wstring>& paths) {
         }
     }
     if (normalized.empty()) {
-        return {};
+        return false;
     }
     std::lock_guard lock(g_storageMutex);
     auto folders = SplitBookmarks(ReadStorageLocked());
@@ -1003,12 +897,10 @@ BookmarkChange ToggleBookmarks(const std::vector<std::wstring>& paths) {
                                    return SamePath(old, path);
                                });
         });
-        BookmarkChange removal;
-        removal.changed = SaveBookmarksLocked(folders);
-        return removal;
+        return SaveBookmarksLocked(folders);
     }
-    auto change = InsertMissingLocked(folders, normalized, folders.size());
-    return SaveInsertedLocked(folders, change);
+    return InsertMissingLocked(folders, normalized, folders.size()) != 0 &&
+           SaveBookmarksLocked(folders);
 }
 
 std::wstring ButtonLabel(const std::wstring& path) {
@@ -1038,7 +930,7 @@ std::wstring ReadFxSetting(int index, const wchar_t* field) {
     std::wstring name = L"fxCustomFolders[" + std::to_wstring(index) +
                         L"]." + field;
     auto value = WindhawkUtils::StringSetting::make(name.c_str());
-    return TrimSetting(value.get());
+    return TrimSetting(value.get() ? value.get() : L"");
 }
 
 std::wstring ExpandFxPath(const std::wstring& raw) {
@@ -1110,20 +1002,15 @@ struct ComScope {
 };
 
 void LoadRecentSettings() {
-    g_recentSettings.enabled = Wh_GetIntSetting(L"recent.enabled") != 0;
+    g_recentSettings.enabled = Wh_GetIntSetting(L"recentFolders") != 0;
     g_recentSettings.buttons = static_cast<size_t>(
-        std::clamp(Wh_GetIntSetting(L"recent.buttons"), 1, kMaxRecentButtons));
+        std::clamp(Wh_GetIntSetting(L"recentButtons"), 1, kMaxRecentButtons));
+    g_recentSettings.menuButton = Wh_GetIntSetting(L"recentMenuButton") != 0;
     g_recentSettings.history = static_cast<size_t>(std::clamp(
-        Wh_GetIntSetting(L"recent.history"),
+        Wh_GetIntSetting(L"recentHistory"),
         static_cast<int>(g_recentSettings.buttons), kMaxRecentHistory));
-    // An unknown value keeps the default: RC shown, right-click offers Clear.
-    auto rcButton = WindhawkUtils::StringSetting::make(L"recent.rcButton");
-    const std::wstring_view rcMode = rcButton.get();
-    g_recentSettings.menuButton = rcMode != L"hidden";
-    g_recentSettings.rightClickClears = rcMode == L"clear";
-    Wh_Log(L"Recent folders: %ls, %zu button(s), %zu remembered, RC %ls",
-           g_recentSettings.enabled ? L"on" : L"off", g_recentSettings.buttons,
-           g_recentSettings.history, rcMode.data());
+    g_recentSettings.rightClickClears =
+        Wh_GetIntSetting(L"recentRightClickClears") != 0;
 }
 
 ULONGLONG FileTimeValue(const FILETIME& time) {
@@ -1274,17 +1161,11 @@ struct TimedFolder {
 
 // Windows adds a shortcut to the folder of each opened file to the Recent
 // folder. The shortcut's stored attributes identify folder targets without
-// touching possibly slow network or removable storage. The Recent folder
-// itself is read only when it is on a local fixed drive.
+// touching possibly slow network or removable storage.
 std::vector<TimedFolder> ScanWindowsRecentFolders() {
     std::vector<TimedFolder> folders;
     auto directory = KnownFolderPath(FOLDERID_Recent);
     if (directory.empty()) {
-        return folders;
-    }
-    if (CheckFolderStatus(directory) != FolderStatus::Available) {
-        Wh_Log(L"Windows recent items skipped: the Recent folder is missing "
-               L"or not on a local fixed drive");
         return folders;
     }
     struct LinkFile {
@@ -1314,7 +1195,7 @@ std::vector<TimedFolder> ScanWindowsRecentFolders() {
     }
     ComScope com;
     for (const auto& link : links) {
-        if (folders.size() >= kMaxWindowsRecentFolders) {
+        if (folders.size() >= kMaxStoredRecents) {
             break;
         }
         winrt::com_ptr<IShellLinkW> shellLink;
@@ -1588,133 +1469,6 @@ HWND ExplorerWindowForElement(const mux::FrameworkElement& element) {
     return IsExplorerFrame(window) ? window : nullptr;
 }
 
-// A short notice under the bar when folders could not all be bookmarked.
-// The flyout is transient, so it should not take focus from the file list; the
-// thread timer hides it. Drops finish off the UI thread and reach it through
-// the refresh message, which carries the notice in its WPARAM.
-struct PendingNotice {
-    HWND frame = nullptr;
-    BookmarkNotice kind = BookmarkNotice::None;
-    unsigned added = 0;
-    unsigned total = 0;
-};
-thread_local PendingNotice g_pendingNotice;
-thread_local UINT_PTR g_noticeTimer = 0;
-
-PendingNotice MakeNotice(HWND frame, const BookmarkChange& change) {
-    return {frame, change.Notice(), static_cast<unsigned>(change.added),
-            static_cast<unsigned>(change.added + change.noRoom)};
-}
-
-WPARAM EncodeNotice(const BookmarkChange& change) {
-    auto byte = [](size_t value) {
-        return static_cast<WPARAM>(std::min<size_t>(value, 255));
-    };
-    return static_cast<WPARAM>(change.Notice()) | (byte(change.added) << 8) |
-           (byte(change.added + change.noRoom) << 16);
-}
-
-PendingNotice DecodeNotice(HWND frame, WPARAM value) {
-    auto kind = static_cast<BookmarkNotice>(value & 0xFF);
-    if (kind > BookmarkNotice::AlreadyBookmarked) {
-        kind = BookmarkNotice::None;
-    }
-    return {frame, kind, static_cast<unsigned>((value >> 8) & 0xFF),
-            static_cast<unsigned>((value >> 16) & 0xFF)};
-}
-
-std::wstring NoticeText(const PendingNotice& notice) {
-    const std::wstring limit = std::to_wstring(kMaxBookmarks);
-    switch (notice.kind) {
-        case BookmarkNotice::Full:
-            return L"Bookmarks full (" + limit + L" folders)";
-        case BookmarkNotice::Partial:
-            return L"Added " + std::to_wstring(notice.added) + L" of " +
-                   std::to_wstring(notice.total) + L": bookmarks full (" +
-                   limit + L")";
-        case BookmarkNotice::AlreadyBookmarked:
-            return L"Already bookmarked";
-        default:
-            return {};
-    }
-}
-
-void HideNotices() {
-    if (g_noticeTimer) {
-        KillTimer(nullptr, g_noticeTimer);
-        g_noticeTimer = 0;
-    }
-    for (auto& bar : *g_bars) {
-        if (!bar.notice) {
-            continue;
-        }
-        try {
-            bar.notice.Hide();
-        } catch (...) {
-            Wh_Log(L"Could not hide the notice: %08X",
-                   winrt::to_hresult().value);
-        }
-    }
-}
-
-void CALLBACK NoticeTimerProc(HWND, UINT, UINT_PTR id, DWORD) {
-    if (id != g_noticeTimer) {
-        KillTimer(nullptr, id);
-        return;
-    }
-    HideNotices();
-}
-
-void ShowBookmarkNotice(const PendingNotice& notice) try {
-    if (notice.kind == BookmarkNotice::None || g_unloading) {
-        return;
-    }
-    BarState* target = nullptr;
-    for (auto& bar : *g_bars) {
-        auto root = bar.barRoot.get();
-        if (root && root.IsLoaded() &&
-            (!notice.frame || IslandWindow(root) == notice.frame)) {
-            target = &bar;
-            break;
-        }
-    }
-    if (!target) {
-        Wh_Log(L"Notice %d dropped: no loaded bar for the window",
-               static_cast<int>(notice.kind));
-        return;
-    }
-    if (!target->notice) {
-        muxc::TextBlock text;
-        muxc::Flyout flyout;
-        flyout.Content(text);
-        flyout.Placement(muxp::FlyoutPlacementMode::Bottom);
-        target->noticeText = text;
-        target->notice = flyout;
-    }
-    target->noticeText.Text(winrt::hstring(NoticeText(notice)));
-    const bool wasOpen = target->notice.IsOpen();
-    if (!wasOpen) {
-        muxp::FlyoutShowOptions options;
-        options.Placement(muxp::FlyoutPlacementMode::Bottom);
-        options.ShowMode(muxp::FlyoutShowMode::Transient);
-        target->notice.ShowAt(target->barRoot.get(), options);
-    }
-    if (g_noticeTimer) {
-        KillTimer(nullptr, g_noticeTimer);
-    }
-    g_noticeTimer = SetTimer(nullptr, 0, kNoticeMs, NoticeTimerProc);
-    Wh_Log(L"Notice shown: kind=%d, added %u of %u, already open=%d, "
-           L"timer=%d",
-           static_cast<int>(notice.kind), notice.added, notice.total,
-           wasOpen ? 1 : 0, g_noticeTimer ? 1 : 0);
-    if (!g_noticeTimer) {
-        // Without a timer nothing would close it.
-        target->notice.Hide();
-    }
-} catch (...) {
-    Wh_Log(L"Could not show the notice: %08X", winrt::to_hresult().value);
-}
-
 std::wstring ShellBrowserFolder(IShellBrowser* browser) {
     winrt::com_ptr<IShellView> view;
     if (FAILED(browser->QueryActiveShellView(view.put())) || !view) {
@@ -1764,8 +1518,7 @@ std::vector<std::wstring> SelectedFolders(HWND explorerWindow) {
         return folders;
     }
     constexpr SFGAOF kFilesystemFolder = SFGAO_FOLDER | SFGAO_FILESYSTEM;
-    const DWORD scanLimit = std::min<DWORD>(count, kMaxSelectionScanned);
-    for (DWORD i = 0; i < scanLimit && folders.size() < kMaxFoldersPerAction;
+    for (DWORD i = 0; i < count && folders.size() < kMaxFoldersPerAction;
          ++i) {
         winrt::com_ptr<IShellItem> item;
         SFGAOF attributes = 0;
@@ -1845,7 +1598,7 @@ void OpenFolderFrom(const mux::FrameworkElement& anchor,
 }
 
 BarState* FindState(const muxc::StackPanel& panel) {
-    for (auto& state : *g_bars) {
+    for (auto& state : g_bars) {
         if (state.buttons.get() == panel) {
             return &state;
         }
@@ -1966,7 +1719,7 @@ void ClearDrag(BarState& state) {
 
 void UpdateFrameRowCount() {
     unsigned rows = 0;
-    for (const auto& bar : *g_bars) {
+    for (const auto& bar : g_bars) {
         if (bar.strip.get()) {
             rows = std::max(rows, bar.rowCount);
         }
@@ -2413,7 +2166,7 @@ mux::UIElement FolderIcon(const std::wstring& path, FolderStatus status) {
 
 void RefreshThreadBars() {
     std::vector<winrt::weak_ref<muxc::StackPanel>> panels;
-    for (const auto& bar : *g_bars) {
+    for (const auto& bar : g_bars) {
         panels.push_back(bar.buttons);
     }
     for (const auto& weakPanel : panels) {
@@ -2595,18 +2348,10 @@ void AttachFolderButtonHandlers(BarState& state, const muxc::Button& button,
                     return;
                 }
                 size_t index = BookmarkDropIndex(panel, position);
-                BookmarkChange change;
-                bool changed;
-                if (fromRecents) {
-                    change = InsertBookmarkAt(source, index);
-                    changed = change.changed;
-                } else {
-                    changed = MoveBookmarkToIndex(source, index);
-                }
-                if (changed) {
+                if (fromRecents ? InsertBookmarkAt(source, index)
+                                : MoveBookmarkToIndex(source, index)) {
                     RefreshPanel(panel);
                 }
-                ShowBookmarkNotice(MakeNotice(IslandWindow(panel), change));
             }});
     // Touch and pen contact can be canceled without a release; mouse
     // presses are covered by DragInProgress.
@@ -2812,7 +2557,7 @@ void AppendRecents(BarState& state, const muxc::StackPanel& recents,
     recents.Children().Append(rcButton);
 }
 
-void RefreshPanel(const muxc::StackPanel& panel) try {
+void RefreshPanel(const muxc::StackPanel& panel) {
     if (g_unloading) {
         return;
     }
@@ -2958,16 +2703,11 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
         }
         auto button = sender.try_as<mux::FrameworkElement>();
         HWND window = button ? ExplorerWindowForElement(button) : nullptr;
-        if (!window) {
-            return;
-        }
-        const auto change = AddBookmark(CurrentFolder(window));
-        if (change.changed) {
+        if (window && AddBookmark(CurrentFolder(window))) {
             if (auto panel = weakPanel.get()) {
                 RefreshPanel(panel);
             }
         }
-        ShowBookmarkNotice(MakeNotice(window, change));
     });
     firstRow.Children().Append(addButton);
 
@@ -3001,21 +2741,10 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
         });
         menu.Items().Append(item);
     };
-    // Like the custom folders, a standard folder is hidden only when it is
-    // missing from a local fixed drive; a redirected share is listed unchecked.
-    auto appendStandard = [&](const wchar_t* label, REFKNOWNFOLDERID id) {
-        auto path = KnownFolderPath(id);
-        if (!path.empty() && CheckFolderStatus(path) == FolderStatus::Missing) {
-            Wh_Log(L"FX: %ls hidden, missing from a local disk: %ls", label,
-                   path.c_str());
-            return;
-        }
-        appendLocation(foldersMenu, label, path);
-    };
-    appendStandard(L"~", FOLDERID_Profile);
-    appendStandard(L"Desktop", FOLDERID_Desktop);
-    appendStandard(L"Documents", FOLDERID_Documents);
-    appendStandard(L"Downloads", FOLDERID_Downloads);
+    appendLocation(foldersMenu, L"~", KnownFolderPath(FOLDERID_Profile));
+    appendLocation(foldersMenu, L"Desktop", KnownFolderPath(FOLDERID_Desktop));
+    appendLocation(foldersMenu, L"Documents", KnownFolderPath(FOLDERID_Documents));
+    appendLocation(foldersMenu, L"Downloads", KnownFolderPath(FOLDERID_Downloads));
     const auto customFolders = LoadFxCustomFolders();
     if (!customFolders.empty()) {
         foldersMenu.Items().Append(muxc::MenuFlyoutSeparator{});
@@ -3089,26 +2818,6 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
     state->lastLayoutWidth = 0;
     if (auto root = state->barRoot.get()) {
         ReflowPanel(panel, root.ActualWidth());
-    }
-} catch (...) {
-    Wh_Log(L"Bookmarks bar refresh failed: %08X", winrt::to_hresult().value);
-    // A half-built panel is rebuilt on the next hover instead of being kept
-    // until the folder check interval passes. The recent buttons of the
-    // previous render may have lost their handlers, so remove them.
-    if (auto state = FindState(panel)) {
-        state->lastFolderCheckAt = 0;
-        state->recentFolders.clear();
-        state->recentButtonCount = 0;
-        state->hasRecentMenuButton = false;
-        state->visibleRecents = 0;
-        try {
-            if (auto recents = state->recents.get()) {
-                recents.Children().Clear();
-            }
-        } catch (...) {
-            Wh_Log(L"Could not clear stale recent folders: %08X",
-                   winrt::to_hresult().value);
-        }
     }
 }
 
@@ -3307,14 +3016,14 @@ void SyncRecentTracking() {
     SyncBrowserConnections(*g_recentTracker);
     Wh_Log(L"Recent tracking: %d tab(s) connected on this thread",
            static_cast<int>(g_recentTracker->browsers.size()));
-    if (g_recentTracker->browsers.empty() && g_bars->empty()) {
+    if (g_recentTracker->browsers.empty() && g_bars.empty()) {
         StopRecentTracking();
     }
 }
 
 // With folders selected in the file list, Ctrl+B toggles those; otherwise it
 // toggles the active tab's folder. Virtual locations have no path.
-BookmarkChange ToggleBookmarksForHotkey(HWND window, bool fileListFocused) {
+bool ToggleBookmarksForHotkey(HWND window, bool fileListFocused) {
     std::vector<std::wstring> paths;
     if (fileListFocused) {
         paths = SelectedFolders(window);
@@ -3324,13 +3033,11 @@ BookmarkChange ToggleBookmarksForHotkey(HWND window, bool fileListFocused) {
             paths.push_back(std::move(path));
         }
     }
-    const auto change = ToggleBookmarks(paths);
-    Wh_Log(L"Ctrl+B: %d folder(s), file list focused=%d, bookmarks changed=%d, "
-           L"added=%d, no room=%d, already bookmarked=%d",
+    const bool changed = ToggleBookmarks(paths);
+    Wh_Log(L"Ctrl+B: %d folder(s), file list focused=%d, bookmarks changed=%d",
            static_cast<int>(paths.size()), fileListFocused ? 1 : 0,
-           change.changed ? 1 : 0, static_cast<int>(change.added),
-           static_cast<int>(change.noRoom), static_cast<int>(change.existing));
-    return change;
+           changed ? 1 : 0);
+    return changed;
 }
 
 void RunThreadWork() {
@@ -3345,24 +3052,16 @@ void RunThreadWork() {
     try {
         while (!g_unloading && (g_recentSyncPending || g_refreshPending ||
                                 g_bookmarkTogglePending)) {
-            if (HWND window = std::exchange(g_bookmarkTogglePending, nullptr)) {
-                const auto change = ToggleBookmarksForHotkey(
-                    window, g_bookmarkToggleFromFileList);
-                if (change.changed) {
-                    g_refreshPending = true;
-                }
-                if (change.Notice() != BookmarkNotice::None) {
-                    g_pendingNotice = MakeNotice(window, change);
-                }
+            if (HWND window = std::exchange(g_bookmarkTogglePending, nullptr);
+                window && ToggleBookmarksForHotkey(
+                              window, g_bookmarkToggleFromFileList)) {
+                g_refreshPending = true;
             }
             if (std::exchange(g_recentSyncPending, false)) {
                 SyncRecentTracking();
             }
             if (std::exchange(g_refreshPending, false)) {
                 RefreshThreadBars();
-            }
-            if (g_pendingNotice.kind != BookmarkNotice::None) {
-                ShowBookmarkNotice(std::exchange(g_pendingNotice, {}));
             }
         }
     } catch (...) {
@@ -3396,11 +3095,6 @@ void StopThreadWork() {
     g_recentSyncPending = false;
     g_refreshPending = false;
     g_bookmarkTogglePending = nullptr;
-    g_pendingNotice = {};
-    if (g_noticeTimer) {
-        KillTimer(nullptr, g_noticeTimer);
-        g_noticeTimer = 0;
-    }
 }
 
 void ScheduleRecentWork(bool sync, bool refresh) {
@@ -3453,7 +3147,7 @@ bool TextInputFocused(HWND frame) {
         }
     }
     try {
-        for (const auto& bar : *g_bars) {
+        for (const auto& bar : g_bars) {
             auto root = bar.barRoot.get();
             if (!root || IslandWindow(root) != frame) {
                 continue;
@@ -3470,42 +3164,10 @@ bool TextInputFocused(HWND frame) {
     return false;
 }
 
-// True when this thread installed the bookmarks bar in the frame.
-// RemoveBarVisuals clears barRoot, so a non-empty barRoot means the bar is in
-// place; on an unknown Windows build TryInstallBar leaves the header alone and
-// this stays false. When the window of an installed bar cannot be determined
-// from its XAML island, Ctrl+B is handled rather than ignored.
-bool FrameHasInstalledBar(HWND frame) {
-    bool unresolved = false;
-    try {
-        for (const auto& bar : *g_bars) {
-            auto root = bar.barRoot.get();
-            if (!root) {
-                continue;
-            }
-            HWND window = IslandWindow(root);
-            if (window == frame) {
-                return true;
-            }
-            unresolved |= !window;
-        }
-    } catch (...) {
-    }
-    if (unresolved) {
-        Wh_Log(L"Ctrl+B: the bookmarks bar window is unknown; handling the "
-               L"key anyway");
-    }
-    return unresolved;
-}
-
 LRESULT CALLBACK ThreadMessageHook(int code, WPARAM wParam, LPARAM lParam) {
     auto message = reinterpret_cast<MSG*>(lParam);
     if (code == HC_ACTION && wParam == PM_REMOVE && !g_unloading &&
         message->message == RefreshBarsMessage()) {
-        if (auto notice = DecodeNotice(message->hwnd, message->wParam);
-            notice.kind != BookmarkNotice::None) {
-            g_pendingNotice = notice;
-        }
         message->message = WM_NULL;
         g_refreshPending = true;
         ScheduleThreadWork();
@@ -3520,15 +3182,11 @@ LRESULT CALLBACK ThreadMessageHook(int code, WPARAM wParam, LPARAM lParam) {
         !(GetKeyState(VK_RWIN) & 0x8000)) {
         HWND frame = message->hwnd ? GetAncestor(message->hwnd, GA_ROOT)
                                    : nullptr;
-        if (IsExplorerFrame(frame)) {
-            if (!FrameHasInstalledBar(frame)) {
-                Wh_Log(L"Ctrl+B ignored: no bookmarks bar in this window");
-            } else if (!TextInputFocused(frame)) {
-                message->message = WM_NULL;
-                g_bookmarkTogglePending = frame;
-                g_bookmarkToggleFromFileList = FileListFocused();
-                ScheduleThreadWork();
-            }
+        if (IsExplorerFrame(frame) && !TextInputFocused(frame)) {
+            message->message = WM_NULL;
+            g_bookmarkTogglePending = frame;
+            g_bookmarkToggleFromFileList = FileListFocused();
+            ScheduleThreadWork();
         }
     }
     return CallNextHookEx(nullptr, code, wParam, lParam);
@@ -3666,9 +3324,10 @@ void OnBarDrop(const muxc::StackPanel& panel, const mux::DragEventArgs& args) {
     Wh_Log(L"Drop accepted: reading items, insertion index %d",
            index == SIZE_MAX ? -1 : static_cast<int>(index));
     auto request = args.DataView().GetStorageItemsAsync();
-    auto onRead = [index, frame](
-                      const auto& completed,
-                      winrt::Windows::Foundation::AsyncStatus status) {
+    ++g_pendingDrops;
+    request.Completed([index, frame](
+                          const auto& completed,
+                          winrt::Windows::Foundation::AsyncStatus status) {
         try {
             if (status != winrt::Windows::Foundation::AsyncStatus::Completed) {
                 Wh_Log(L"Dropped items could not be read: status %d",
@@ -3687,34 +3346,18 @@ void OnBarDrop(const muxc::StackPanel& panel, const mux::DragEventArgs& args) {
                     }
                 }
             }
-            const auto change =
-                g_unloading ? BookmarkChange{} : InsertBookmarks(paths, index);
-            Wh_Log(L"Drop read finished: %d folder(s) found, inserted=%d, "
-                   L"added=%d, no room=%d, already bookmarked=%d",
-                   static_cast<int>(paths.size()), change.changed ? 1 : 0,
-                   static_cast<int>(change.added),
-                   static_cast<int>(change.noRoom),
-                   static_cast<int>(change.existing));
-            if (frame && (change.changed ||
-                          change.Notice() != BookmarkNotice::None)) {
-                PostMessageW(frame, RefreshBarsMessage(),
-                             EncodeNotice(change), 0);
+            const bool inserted = !g_unloading && InsertBookmarks(paths, index);
+            Wh_Log(L"Drop read finished: %d folder(s) found, inserted=%d",
+                   static_cast<int>(paths.size()), inserted ? 1 : 0);
+            if (inserted && frame) {
+                PostMessageW(frame, RefreshBarsMessage(), 0, 0);
             }
         } catch (...) {
             Wh_Log(L"Could not bookmark dropped folders: %08X",
                    winrt::to_hresult().value);
         }
         --g_pendingDrops;
-    };
-    ++g_pendingDrops;
-    try {
-        request.Completed(onRead);
-    } catch (...) {
-        // Nothing will complete this read, so it must not delay unloading.
-        --g_pendingDrops;
-        Wh_Log(L"Could not wait for the dropped items: %08X",
-               winrt::to_hresult().value);
-    }
+    });
 }
 
 muxc::Grid FindNavigationGrid(const mux::DependencyObject& root, int depth) {
@@ -3804,15 +3447,6 @@ void RemoveBarVisuals(BarState& state) {
     state.recentButtonCount = 0;
     state.hasRecentMenuButton = false;
     state.visibleRecents = 0;
-    if (state.notice) {
-        try {
-            state.notice.Hide();
-        } catch (...) {
-            Wh_Log(L"Notice cleanup failed: %08X", winrt::to_hresult().value);
-        }
-        state.notice = nullptr;
-        state.noticeText = nullptr;
-    }
     state.addedRow = nullptr;
     state.commandRow = nullptr;
     state.createdFirstRow = false;
@@ -3847,7 +3481,7 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
         return;
     }
 
-    for (auto& item : *g_bars) {
+    for (auto& item : g_bars) {
         if (item.commandBar.get() == commandBar) {
             state = &item;
             break;
@@ -3973,24 +3607,23 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
     grid.InvalidateMeasure();
     host.InvalidateMeasure();
     auto weakButtons = winrt::make_weak(buttons);
-    state->rootPointerToken = barRoot.PointerEntered(GuardHandler(
-        L"Bar PointerEntered handler", [weakButtons](auto const&, auto const&) {
+    state->rootPointerToken =
+        barRoot.PointerEntered([weakButtons](auto const&, auto const&) {
             auto panel = weakButtons.get();
             if (!panel) {
                 return;
             }
             RefreshPanel(panel);
-        }));
+        });
     // The full bar width decides both the recents and the bookmark wrapping.
-    state->rootSizeToken = barRoot.SizeChanged(GuardHandler(
-        L"Bar SizeChanged handler",
+    state->rootSizeToken = barRoot.SizeChanged(
         [weakButtons](auto const&, const mux::SizeChangedEventArgs& args) {
             if (auto panel = weakButtons.get()) {
                 ReflowPanel(panel, args.NewSize().Width);
             }
-        }));
-    state->rootLoadedToken = barRoot.Loaded(GuardHandler(
-        L"Bar Loaded handler", [weakButtons](auto const&, auto const&) {
+        });
+    state->rootLoadedToken = barRoot.Loaded(
+        [weakButtons](auto const&, auto const&) {
             if (auto panel = weakButtons.get()) {
                 if (auto bar = FindState(panel)) {
                     if (auto root = bar->barRoot.get()) {
@@ -3998,29 +3631,27 @@ void TryInstallBar(const muxc::CommandBar& commandBar) {
                     }
                 }
             }
-        }));
-    state->rootDragOverToken = barRoot.DragOver(GuardHandler(
-        L"Bar DragOver handler",
+        });
+    state->rootDragOverToken = barRoot.DragOver(
         [weakButtons](auto const&, const mux::DragEventArgs& args) {
             if (auto panel = weakButtons.get()) {
                 OnBarDragOver(panel, args);
             }
-        }));
-    state->rootDragLeaveToken = barRoot.DragLeave(GuardHandler(
-        L"Bar DragLeave handler", [weakButtons](auto const&, auto const&) {
+        });
+    state->rootDragLeaveToken = barRoot.DragLeave(
+        [weakButtons](auto const&, auto const&) {
             if (auto panel = weakButtons.get()) {
                 if (auto bar = FindState(panel)) {
                     ClearDropTarget(*bar);
                 }
             }
-        }));
-    state->rootDropToken = barRoot.Drop(GuardHandler(
-        L"Bar Drop handler",
+        });
+    state->rootDropToken = barRoot.Drop(
         [weakButtons](auto const&, const mux::DragEventArgs& args) {
             if (auto panel = weakButtons.get()) {
                 OnBarDrop(panel, args);
             }
-        }));
+        });
     RefreshPanel(buttons);
     UpdateFrameRowCount();
     } catch (...) {
@@ -4042,14 +3673,14 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
         commandBar.Name() != L"FileExplorerCommandBar") {
         return;
     }
-    for (const auto& state : *g_bars) {
+    for (const auto& state : g_bars) {
         if (state.commandBar.get() == commandBar) {
             TryInstallBar(commandBar);
             return;
         }
     }
     // Tabs come and go; forget bars whose command bar and strip are gone.
-    g_bars->remove_if([](BarState& state) {
+    g_bars.remove_if([](BarState& state) {
         if (state.commandBar.get() || state.strip.get()) {
             return false;
         }
@@ -4059,18 +3690,16 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
         return true;
     });
     UpdateFrameRowCount();
-    g_bars->emplace_back();
-    BarState& state = g_bars->back();
+    g_bars.emplace_back();
+    BarState& state = g_bars.back();
     state.commandBar = winrt::make_weak(commandBar);
     auto weakBar = state.commandBar;
-    state.loadedToken = commandBar.Loaded(GuardHandler(
-        L"Command bar Loaded handler", [weakBar](auto const&, auto const&) {
-            if (auto bar = weakBar.get()) {
-                TryInstallBar(bar);
-            }
-        }));
-    state.unloadedToken = commandBar.Unloaded(GuardHandler(
-        L"Command bar Unloaded handler",
+    state.loadedToken = commandBar.Loaded([weakBar](auto const&, auto const&) {
+        if (auto bar = weakBar.get()) {
+            TryInstallBar(bar);
+        }
+    });
+    state.unloadedToken = commandBar.Unloaded(
         [weakBar](auto const&, auto const&) {
             auto bar = weakBar.get();
             // WinUI can raise Unloaded after a quick re-add has already raised
@@ -4078,7 +3707,7 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
             if (!bar || bar.IsLoaded()) {
                 return;
             }
-            for (auto& state : *g_bars) {
+            for (auto& state : g_bars) {
                 if (state.commandBar.get() == bar) {
                     // Another tab's command bar can share a header that stays
                     // on screen; keep the bar there instead of removing it.
@@ -4095,13 +3724,13 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
                     break;
                 }
             }
-            if (std::none_of(g_bars->begin(), g_bars->end(),
+            if (std::none_of(g_bars.begin(), g_bars.end(),
                              [](const BarState& state) {
                                  return !!state.strip.get();
                              })) {
                 g_iconCache.clear();
             }
-        }));
+        });
     TryInstallBar(commandBar);
     InstallMessageHook();
     // A new command bar usually means a new tab to follow for recents.
@@ -4148,7 +3777,7 @@ void ScanCurrentThreadForCommandBars() try {
         return;
     }
     std::vector<winrt::weak_ref<muxc::CommandBar>> knownBars;
-    for (const auto& state : *g_bars) {
+    for (const auto& state : g_bars) {
         knownBars.push_back(state.commandBar);
     }
     for (const auto& weakBar : knownBars) {
@@ -4290,12 +3919,8 @@ void CleanupCurrentThread() {
         Wh_Log(L"Recent folder tracking cleanup failed: %08X",
                winrt::to_hresult().value);
     }
-    if (!g_bars) {
-        // Another window on this thread already ran this cleanup.
-        return;
-    }
-    bool hadBars = !g_bars->empty();
-    for (auto& state : *g_bars) {
+    bool hadBars = !g_bars.empty();
+    for (auto& state : g_bars) {
         try {
             if (auto commandBar = state.commandBar.get()) {
                 commandBar.Loaded(state.loadedToken);
@@ -4307,9 +3932,7 @@ void CleanupCurrentThread() {
                    winrt::to_hresult().value);
         }
     }
-    // The hooks, timers, listeners and handlers are gone and g_unloading is
-    // set, so nothing on this thread reads g_bars after this.
-    g_bars.reset();
+    g_bars.clear();
     g_iconCache.clear();
     if (hadBars) {
         // The size hook is inactive now, so Explorer returns to its stock
@@ -4389,9 +4012,152 @@ void CloseActiveDialogCurrentThread() {
     }
 }
 
+// File dialogs in any process. Each new Open or Save dialog receives the
+// recent folders as navigation-pane places before the program shows it.
+bool g_isExplorer = false;
+
+bool IsExplorerProcess() {
+    wchar_t path[MAX_PATH]{};
+    DWORD length = GetModuleFileNameW(nullptr, path, ARRAYSIZE(path));
+    if (length == 0 || length == ARRAYSIZE(path)) {
+        return false;
+    }
+    const wchar_t* base = wcsrchr(path, L'\\');
+    return _wcsicmp(base ? base + 1 : path, L"explorer.exe") == 0;
+}
+
+winrt::com_ptr<IShellItem> FolderShellItem(const std::wstring& path) {
+    winrt::com_ptr<IShellItem> item;
+    if (CheckFolderStatus(path) == FolderStatus::Available &&
+        SUCCEEDED(SHCreateItemFromParsingName(path.c_str(), nullptr,
+                                              IID_PPV_ARGS(item.put())))) {
+        return item;
+    }
+    // A simple ID list needs no I/O, so network and removable folders never
+    // delay the dialog.
+    item = nullptr;
+    PIDLIST_ABSOLUTE pidl = SHSimpleIDListFromPath(path.c_str());
+    if (pidl) {
+        SHCreateItemFromIDList(pidl, IID_PPV_ARGS(item.put()));
+        CoTaskMemFree(pidl);
+    }
+    return item;
+}
+
+void AddRecentPlaces(IUnknown* object) try {
+    winrt::com_ptr<IFileDialog> dialog;
+    if (FAILED(object->QueryInterface(IID_PPV_ARGS(dialog.put())))) {
+        return;
+    }
+    std::vector<std::wstring> bookmarks;
+    {
+        std::lock_guard lock(g_storageMutex);
+        bookmarks = SplitBookmarks(ReadStorageLocked());
+    }
+    int added = 0;
+    for (const auto& path : LoadRecentView(bookmarks).folders) {
+        if (auto item = FolderShellItem(path)) {
+            if (SUCCEEDED(dialog->AddPlace(item.get(), FDAP_TOP))) {
+                ++added;
+            }
+        }
+    }
+    Wh_Log(L"File dialog: added %d recent place(s)", added);
+} catch (...) {
+    Wh_Log(L"Could not add recent folders to a file dialog: %08X",
+           winrt::to_hresult().value);
+}
+
+bool IsFileDialogClass(REFCLSID clsid) {
+    return IsEqualCLSID(clsid, CLSID_FileOpenDialog) ||
+           IsEqualCLSID(clsid, CLSID_FileSaveDialog);
+}
+
+// CoCreateInstance may be implemented through CoCreateInstanceEx; the guard
+// keeps one creation from being handled twice.
+thread_local bool g_creatingFileDialog = false;
+
+using CoCreateInstance_t = decltype(&CoCreateInstance);
+CoCreateInstance_t g_coCreateInstanceOriginal = nullptr;
+HRESULT WINAPI CoCreateInstanceHook(REFCLSID clsid, LPUNKNOWN outer,
+                                    DWORD context, REFIID iid,
+                                    LPVOID* object) {
+    if (g_creatingFileDialog || !IsFileDialogClass(clsid)) {
+        return g_coCreateInstanceOriginal(clsid, outer, context, iid, object);
+    }
+    OperationScope operation;
+    g_creatingFileDialog = true;
+    HRESULT result =
+        g_coCreateInstanceOriginal(clsid, outer, context, iid, object);
+    g_creatingFileDialog = false;
+    if (operation.active && SUCCEEDED(result) && !outer && object &&
+        *object) {
+        AddRecentPlaces(static_cast<IUnknown*>(*object));
+    }
+    return result;
+}
+
+using CoCreateInstanceEx_t = decltype(&CoCreateInstanceEx);
+CoCreateInstanceEx_t g_coCreateInstanceExOriginal = nullptr;
+HRESULT WINAPI CoCreateInstanceExHook(REFCLSID clsid, IUnknown* outer,
+                                      DWORD context, COSERVERINFO* server,
+                                      DWORD count, MULTI_QI* results) {
+    if (g_creatingFileDialog || !IsFileDialogClass(clsid)) {
+        return g_coCreateInstanceExOriginal(clsid, outer, context, server,
+                                            count, results);
+    }
+    OperationScope operation;
+    g_creatingFileDialog = true;
+    HRESULT result = g_coCreateInstanceExOriginal(clsid, outer, context,
+                                                  server, count, results);
+    g_creatingFileDialog = false;
+    if (!operation.active || FAILED(result) || outer || !results) {
+        return result;
+    }
+    for (DWORD i = 0; i < count; ++i) {
+        if (SUCCEEDED(results[i].hr) && results[i].pItf) {
+            AddRecentPlaces(results[i].pItf);
+            break;
+        }
+    }
+    return result;
+}
+
+bool HookFileDialogCreation() {
+    HMODULE combase = GetModuleHandleW(L"combase.dll");
+    if (!combase) {
+        combase = LoadLibraryExW(L"combase.dll", nullptr,
+                                 LOAD_LIBRARY_SEARCH_SYSTEM32);
+    }
+    auto coCreateInstance = combase
+                                ? reinterpret_cast<CoCreateInstance_t>(
+                                      GetProcAddress(combase, "CoCreateInstance"))
+                                : nullptr;
+    auto coCreateInstanceEx =
+        combase ? reinterpret_cast<CoCreateInstanceEx_t>(
+                      GetProcAddress(combase, "CoCreateInstanceEx"))
+                : nullptr;
+    return coCreateInstance && coCreateInstanceEx &&
+           WindhawkUtils::SetFunctionHook(coCreateInstance,
+                                          CoCreateInstanceHook,
+                                          &g_coCreateInstanceOriginal) &&
+           WindhawkUtils::SetFunctionHook(coCreateInstanceEx,
+                                          CoCreateInstanceExHook,
+                                          &g_coCreateInstanceExOriginal);
+}
+
 BOOL Wh_ModInit() {
     LoadRecentSettings();
     g_bookmarkHotkey = Wh_GetIntSetting(L"bookmarkHotkey") != 0;
+    g_isExplorer = IsExplorerProcess();
+    if (g_recentSettings.enabled &&
+        Wh_GetIntSetting(L"recentInFileDialogs") != 0 &&
+        !HookFileDialogCreation()) {
+        Wh_Log(L"Could not hook file dialog creation");
+    }
+    if (!g_isExplorer) {
+        return TRUE;
+    }
     HMODULE kernelBase = GetModuleHandleW(L"kernelbase.dll");
     auto loadLibraryExW = kernelBase
                               ? reinterpret_cast<LoadLibraryExW_t>(
@@ -4414,6 +4180,9 @@ BOOL Wh_ModInit() {
 }
 
 void Wh_ModAfterInit() {
+    if (!g_isExplorer) {
+        return;
+    }
     HookExplorerFrame(true);
     HookExplorerExtension(true);
     if (g_frameHooked && g_extensionHooked) {
@@ -4437,10 +4206,6 @@ void Wh_ModUninit() {
     }
     for (int attempt = 0; attempt < 50 && g_pendingDrops != 0; ++attempt) {
         Sleep(100);
-    }
-    if (g_pendingDrops != 0) {
-        Wh_Log(L"Wh_ModUninit: %u dropped-item read(s) still pending",
-               g_pendingDrops.load());
     }
     ForExplorerWindows(CleanupCurrentThread);
 }

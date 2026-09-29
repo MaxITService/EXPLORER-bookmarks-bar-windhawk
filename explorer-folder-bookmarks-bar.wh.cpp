@@ -1,7 +1,7 @@
 // ==WindhawkMod==
 // @id              explorer-folder-bookmarks-bar
-// @name            Explorer Folder Bookmarks Bar (Double Decker)
-// @description     Adds two independent, scrollable bookmark rows below the Windows 11 File Explorer address bar.
+// @name            Explorer Folder Bookmarks Bar
+// @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
 // @version         0.7.8
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
@@ -11,66 +11,53 @@
 // @license         MIT
 // ==/WindhawkMod==
 
-// DOUBLE-DECKER CANDIDATE — NOT TESTED IN FILE EXPLORER.
-// Local x64 and ARM64 syntax and test-only DLL link checks have passed.
-// This source shares the production mod ID; compile only one variant at a time.
-
 // ==WindhawkModReadme==
 /*
-# Explorer Folder Bookmarks Bar (Double Decker)
+# Explorer Folder Bookmarks Bar
 
-**Experimental double-decker source: not tested in a live Explorer window.**
-The local compiler checks do not verify its layout or runtime behavior.
-
-For the Windows 11 WinUI File Explorer. A narrow row appears below the address
-bar. Click **+** to bookmark the current filesystem folder. Click a bookmark
-to navigate the active tab to it, or Ctrl+click to ask Explorer to open it in
-a new tab. Drag a bookmark onto another to reorder the row. Middle-click a
+For the Windows 11 WinUI File Explorer. A scrollable bookmark bar appears below
+the address bar. Click **+** to bookmark the current filesystem folder. Click a
+bookmark to navigate the active tab to it. Ctrl+click asks Explorer to open it
+in a new tab. Drag a bookmark onto another to reorder the row. Middle-click a
 bookmark to remove it from the bar. Removing a bookmark never deletes its
 target folder.
 
-This experimental variant has two fixed rows, each scrolling sideways in a
-narrow window. Each row has its own **+**, bookmark list, drag order, and backup
-file. The lower row has no FX button. The upper row reuses the one-row mod's
-existing bookmarks; the lower row starts empty. Use only one variant of this
-mod ID at a time.
-Left-click **FX** on the upper row for the profile (**~**), Desktop, Documents,
-Downloads, and custom folders from **Settings → FX custom folders**.
-Custom shortcuts are empty by default. Add a folder path and optional label
-in **Settings → FX custom folders**; blank entries are ignored. Paths must be
+![Explorer Folder Bookmarks Bar in File Explorer](https://raw.githubusercontent.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/main/Promo/How-it-works.gif)
+
+After enabling or updating the mod, open a new File Explorer window to use the
+bar. Windows that were already open may remain unchanged. Opening a new window
+is the supported way to activate the bar without relying on live window updates.
+
+The bar expands from one to four rows as the window narrows. If bookmarks
+still exceed the fourth row, the bar can pan sideways.
+Left-click **FX**, next to **+**, for the profile (**~**), Desktop, Documents,
+Downloads, and the custom folders listed in this mod's Windhawk settings.
+Custom shortcuts are empty by default. Add a folder path and optional label in
+**Settings → FX custom folders**; blank entries are ignored. Paths must be
 absolute, and `%NAME%` environment variables are expanded. Local, network
 (UNC or mapped drive) and removable-drive folders all work. A folder missing
 from a local disk is hidden from FX until it exists again. Like bookmarks,
 network and removable entries are shown without being checked; if one is
 unavailable, Explorer reports it when you click it. New settings take effect in
-newly opened Explorer windows. Windows already open when the mod is enabled
-or updated may remain unchanged.
-Right-click **FX** for all drives with their labels, plus
-**Save layout diagnostics**. The drive list updates each time the menu opens.
-Ctrl+click a menu entry to open it in a new tab. The diagnostics command appends
-a geometry snapshot to
-`%TEMP%\explorer-folder-bookmarks-diagnostics.txt`.
+newly opened Explorer windows. Right-click **FX** for all drives with their
+labels. The list updates each time the menu opens. Ctrl+click a menu entry to
+open it in a new tab.
 
-Right-click either **+** for **Save bookmarks** and **Load bookmarks**. The
-commands open a file dialog so you can choose the JSON backup for that row.
-The profile folder and a row-specific filename are suggested initially.
-Loading replaces only that row's list after the entire UTF-8 JSON file passes
-validation.
+Right-click **+** for **Save bookmarks** and **Load bookmarks**. The commands
+open a file dialog so you can choose the JSON backup. The profile folder is
+suggested initially. Loading replaces the current list only after the entire
+UTF-8 JSON file passes validation.
 
-If the bar is clipped, use **Save layout diagnostics** and check Windhawk's
-**Show Log Output** for errors.
-
-Each bookmark list lives in this mod's Windhawk local storage. This version
-supports up to 32 folders per row and uses the folder name as the button label. Icons
+The bookmark list lives in this mod's Windhawk local storage. This version
+supports up to 32 folders and uses the folder name as the button label. Icons
 come from Windows Shell, including desktop.ini custom folder icons. Hovering a
 bookmark shows its full path. Virtual locations such as Home are ignored by
 **+**. Bookmark removal never touches the target folder or its contents.
 Missing folders on local fixed drives show a yellow warning icon. Icons are
 cached for up to five minutes and refreshed when the bar redraws.
 
-This is an experimental MVP for recent Windows 11 builds. Its XAML insertion
-point can change in a Windows update. If the row is not visible, disable the
-mod and check the Windhawk log before trying it again.
+The XAML insertion point can change in a Windows update. If the bar is not
+visible, disable the mod and check the Windhawk log before trying it again.
 */
 // ==/WindhawkModReadme==
 
@@ -84,7 +71,7 @@ mod and check the Windhawk log before trying it again.
         $name: Folder path
         $description: Full path of the folder, for example C:\Projects, \\server\share\Docs or %USERPROFILE%\Pictures. Leave blank to skip this entry. A folder missing from a local disk is hidden until it exists again.
   $name: FX custom folders
-  $description: Adds your own folders to the menu of the FX button (on the upper row of the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of all drives. Changes apply to Explorer windows opened after you save. Local, network and removable-drive folders all work. A folder missing from a local disk is hidden until it exists again; network and removable entries are always shown, and Explorer reports it if one is unavailable when you click it.
+  $description: Adds your own folders to the menu of the FX button (the second button on the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of all drives. Changes apply to Explorer windows opened after you save. Local, network and removable-drive folders all work. A folder missing from a local disk is hidden until it exists again; network and removable entries are always shown, and Explorer reports it if one is unavailable when you click it.
 */
 // ==/WindhawkModSettings==
 
@@ -109,6 +96,7 @@ mod and check the Windhawk log before trying it again.
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Microsoft.UI.Content.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
@@ -116,18 +104,20 @@ mod and check the Windhawk log before trying it again.
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
-#include <winrt/Windows.UI.Input.h>
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <cstring>
 #include <cwctype>
 #include <cwchar>
 #include <functional>
-#include <iomanip>
 #include <iterator>
 #include <list>
 #include <mutex>
-#include <sstream>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -140,34 +130,38 @@ namespace muxmi = winrt::Microsoft::UI::Xaml::Media::Imaging;
 namespace wjson = winrt::Windows::Data::Json;
 
 constexpr wchar_t kBarName[] = L"WindhawkExplorerFolderBookmarksBar";
-constexpr wchar_t kSecondBarName[] = L"WindhawkExplorerFolderBookmarksBar2";
 constexpr size_t kMaxStorageChars = 30000;
 constexpr size_t kMaxBookmarks = 32;
 constexpr DWORD kMaxImportBytes = 262144;
 constexpr wchar_t kExportFileName[] = L"explorer-folder-bookmarks.json";
-constexpr wchar_t kSecondExportFileName[] =
-    L"explorer-folder-bookmarks-row2.json";
-constexpr wchar_t kDiagnosticsFileName[] =
-    L"explorer-folder-bookmarks-diagnostics.txt";
 constexpr size_t kMaxCustomFxFolders = 24;
 constexpr size_t kMaxCachedIcons = 64;
 constexpr ULONGLONG kFolderCheckIntervalMs = 10000;
 constexpr ULONGLONG kIconCacheLifetimeMs = 300000;
 constexpr ULONGLONG kFailedIconCacheLifetimeMs = 30000;
-// Each strip reserves 38 layout units.
+// The stock header at 96 DPI measured 38 + 48 + 48 units. Its centered
+// navigation Grid is 54 units high, overhanging the 48-unit navigation row by
+// 3 units on each side. An added 38-unit strip therefore needs 38 + 6 = 44
+// extra units in the host when the command row stays at its natural 48.
 constexpr double kRowHeight = 38.0;
-// A 2-unit inset before the lower strip yields 8 units between 32-unit buttons.
-constexpr double kInterRowGap = 2.0;
-constexpr double kTotalRowHeight = 2 * kRowHeight + kInterRowGap;
 constexpr double kButtonHeight = 32.0;
 constexpr double kButtonVerticalInset = (kRowHeight - kButtonHeight) / 2.0;
+constexpr double kInterRowGap = 2.0;
+constexpr unsigned kMaxRows = 4;
+// Lift the visible strip without changing its reserved layout height.
 constexpr double kRowOpticalLift = 3.0;
-// Stock navigation overhangs its row by 3 units above and below. With the
-// command row fixed to Auto, the two strips and 2-unit inter-row inset need
-// 38 + 40 + 6 = 84 host units at 96 DPI.
-constexpr int kHostExtraAt96Dpi = 84;
+constexpr int kNavigationOverhang = 6;
 constexpr int kMeasuredHostHeightAt96Dpi = 136;
+constexpr size_t kFixedButtons = 2;
 constexpr float kDragThreshold = 6.0f;
+
+constexpr double RowAllocation(unsigned rows) {
+    return kRowHeight * rows + kInterRowGap * (rows - 1);
+}
+
+constexpr int HostExtraAt96Dpi(unsigned rows) {
+    return static_cast<int>(RowAllocation(rows)) + kNavigationOverhang;
+}
 
 // Public Shell COM identifiers, defined here to avoid SDK import ambiguity.
 constexpr CLSID kShellWindows = {
@@ -181,19 +175,29 @@ std::mutex g_storageMutex;
 std::atomic<bool> g_unloading = false;
 std::atomic<bool> g_extensionHooked = false;
 std::atomic<bool> g_frameHooked = false;
+std::atomic<bool> g_extensionHookAttempted = false;
+std::atomic<bool> g_frameHookAttempted = false;
+std::mutex g_dialogMutex;
+std::condition_variable g_dialogFinished;
+unsigned g_activeDialogOperations = 0;
+thread_local IFileDialog* g_threadFileDialog = nullptr;
 
 struct BarState {
-    unsigned rowIndex = 0;
     winrt::weak_ref<muxc::CommandBar> commandBar;
     winrt::event_token loadedToken{};
+    winrt::event_token unloadedToken{};
     winrt::weak_ref<muxc::Grid> grid;
     winrt::weak_ref<muxc::Grid> hostGrid;
     winrt::weak_ref<mux::FrameworkElement> navControl;
     winrt::weak_ref<muxc::ScrollViewer> strip;
     winrt::weak_ref<muxc::StackPanel> buttons;
     winrt::event_token stripPointerToken{};
+    winrt::event_token stripSizeToken{};
+    winrt::event_token stripLoadedToken{};
     std::vector<std::function<void()>> panelHandlers;
     std::vector<std::function<void()>> driveHandlers;
+    // Keep row definitions strong: they are not UIElements, and XAML can
+    // discard an unreferenced wrapper so a weak reference no longer resolves.
     muxc::RowDefinition addedRow{nullptr};
     muxc::RowDefinition commandRow{nullptr};
     mux::GridLength oldCommandRowHeight{1.0, mux::GridUnitType::Star};
@@ -202,6 +206,11 @@ struct BarState {
     double oldNavMinHeight = 0;
     double appliedGridMinHeight = 0;
     double appliedNavMinHeight = 0;
+    double originalGridHeight = 0;
+    double originalNavHeight = 0;
+    unsigned rowCount = 1;
+    double lastLayoutWidth = 0;
+    bool reflowing = false;
     std::wstring renderedStorage;
     ULONGLONG lastFolderCheckAt = 0;
     std::wstring dragPath;
@@ -213,7 +222,6 @@ struct BarState {
     std::wstring suppressClick;
     double dragOldOpacity = 1.0;
     winrt::weak_ref<muxc::Button> dropTarget;
-    muxm::Brush dropOldBrush{nullptr};
     mux::Thickness dropOldThickness{};
     bool dropAfter = false;
 };
@@ -222,6 +230,9 @@ struct BarState {
 // Stable addresses matter while XAML layout callbacks run and new Explorer
 // tabs can register another command bar on the same UI thread.
 thread_local std::list<BarState> g_bars;
+// Explorer's XAML window and its size hook run on the same UI thread. Use the
+// largest active bar on that thread so another tab cannot be clipped.
+thread_local unsigned g_frameRows = 0;
 
 void RevokeHandlers(std::vector<std::function<void()>>& handlers) {
     auto pending = std::move(handlers);
@@ -272,9 +283,16 @@ void TrackPointer(std::vector<std::function<void()>>& handlers,
         }
     });
 }
+struct IconPixels {
+    int width = 0;
+    int height = 0;
+    std::vector<BYTE> bytes;
+};
+
 struct IconCacheEntry {
     std::wstring path;
-    muxmi::WriteableBitmap bitmap{nullptr};
+    std::optional<IconPixels> pixels;
+    winrt::weak_ref<muxmi::WriteableBitmap> bitmap;
     bool attempted = false;
     ULONGLONG loadedAt = 0;
     ULONGLONG usedAt = 0;
@@ -328,18 +346,9 @@ FolderStatus CheckFolderStatus(const std::wstring& path) {
     return FolderStatus::Unknown;
 }
 
-const wchar_t* StorageKey(unsigned rowIndex) {
-    return rowIndex == 0 ? L"folders" : L"folders2";
-}
-
-size_t FixedButtons(const BarState& state) {
-    return state.rowIndex == 0 ? 2 : 1;
-}
-
-std::wstring ReadStorageLocked(unsigned rowIndex) {
+std::wstring ReadStorageLocked() {
     std::vector<wchar_t> buffer(kMaxStorageChars + 1);
-    size_t chars = Wh_GetStringValue(StorageKey(rowIndex), buffer.data(),
-                                     buffer.size());
+    size_t chars = Wh_GetStringValue(L"folders", buffer.data(), buffer.size());
     if (chars == 0 || chars > kMaxStorageChars) {
         return {};
     }
@@ -363,8 +372,7 @@ std::vector<std::wstring> SplitBookmarks(const std::wstring& storage) {
     return folders;
 }
 
-bool SaveBookmarksLocked(unsigned rowIndex,
-                         const std::vector<std::wstring>& folders) {
+bool SaveBookmarksLocked(const std::vector<std::wstring>& folders) {
     std::wstring storage;
     for (const auto& folder : folders) {
         if (!storage.empty()) {
@@ -373,12 +381,11 @@ bool SaveBookmarksLocked(unsigned rowIndex,
         storage += folder;
     }
     return storage.size() <= kMaxStorageChars &&
-           Wh_SetStringValue(StorageKey(rowIndex), storage.c_str());
+           Wh_SetStringValue(L"folders", storage.c_str());
 }
 
-// The backup is separate from Windhawk's live storage. Resolve the known
-// profile directory instead of trusting an environment variable.
-std::wstring SuggestedBackupPath(unsigned rowIndex) {
+// Suggest the profile location for an export without fixing the user's choice.
+std::wstring SuggestedBackupPath() {
     PWSTR profile = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_Profile, KF_FLAG_DEFAULT,
                                     nullptr, &profile)) || !profile) {
@@ -392,7 +399,7 @@ std::wstring SuggestedBackupPath(unsigned rowIndex) {
     if (path.back() != L'\\') {
         path += L'\\';
     }
-    return path + (rowIndex == 0 ? kExportFileName : kSecondExportFileName);
+    return path + kExportFileName;
 }
 
 std::wstring KnownFolderPath(REFKNOWNFOLDERID folderId) {
@@ -404,32 +411,6 @@ std::wstring KnownFolderPath(REFKNOWNFOLDERID folderId) {
     std::wstring path(value);
     CoTaskMemFree(value);
     return NormalizePath(std::move(path));
-}
-
-std::wstring TempFolderPath() {
-    std::vector<wchar_t> buffer(MAX_PATH + 1);
-    DWORD length = GetTempPathW(static_cast<DWORD>(buffer.size()),
-                                buffer.data());
-    if (length >= buffer.size()) {
-        buffer.resize(static_cast<size_t>(length) + 1);
-        length = GetTempPathW(static_cast<DWORD>(buffer.size()),
-                              buffer.data());
-    }
-    if (length == 0 || length >= buffer.size()) {
-        return {};
-    }
-    auto path = NormalizePath(buffer.data());
-    DWORD attributes = GetFileAttributesW(path.c_str());
-    return attributes != INVALID_FILE_ATTRIBUTES &&
-                   (attributes & FILE_ATTRIBUTE_DIRECTORY)
-               ? path
-               : std::wstring{};
-}
-
-std::wstring DiagnosticsPath() {
-    auto directory = TempFolderPath();
-    return directory.empty() ? std::wstring{}
-                             : directory + L"\\" + kDiagnosticsFileName;
 }
 
 std::wstring DriveMenuLabel(const std::wstring& root) {
@@ -524,34 +505,6 @@ bool WideToUtf8(const std::wstring& wide, std::string& utf8) {
                                utf8.data(), count, nullptr, nullptr) == count;
 }
 
-bool AppendDiagnostics(const std::wstring& path,
-                       const std::wstring& report) {
-    std::string bytes;
-    if (path.empty() || report.empty() ||
-        !WideToUtf8(report, bytes) || bytes.size() > 65536) {
-        SetLastError(ERROR_INVALID_DATA);
-        return false;
-    }
-    // One WriteFile keeps each small snapshot together even if several
-    // Explorer processes append at about the same time.
-    ScopedFile file(CreateFileW(path.c_str(), FILE_APPEND_DATA,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-    if (file.value == INVALID_HANDLE_VALUE) {
-        return false;
-    }
-    DWORD written = 0;
-    if (!WriteFile(file.value, bytes.data(), static_cast<DWORD>(bytes.size()),
-                   &written, nullptr)) {
-        return false;
-    }
-    if (written != bytes.size()) {
-        SetLastError(ERROR_WRITE_FAULT);
-        return false;
-    }
-    return FlushFileBuffers(file.value) != 0;
-}
-
 bool Utf8ToWide(const std::string& utf8, std::wstring& wide) {
     if (utf8.empty() || utf8.size() > INT_MAX) {
         return false;
@@ -568,14 +521,14 @@ bool Utf8ToWide(const std::string& utf8, std::wstring& wide) {
                                wide.data(), count) == count;
 }
 
-bool SaveBackup(const std::wstring& path, unsigned rowIndex) try {
+bool SaveBackup(const std::wstring& path) try {
     if (path.empty()) {
         return false;
     }
     std::vector<std::wstring> folders;
     {
         std::lock_guard lock(g_storageMutex);
-        folders = SplitBookmarks(ReadStorageLocked(rowIndex));
+        folders = SplitBookmarks(ReadStorageLocked());
     }
     wjson::JsonObject root;
     root.SetNamedValue(L"format", wjson::JsonValue::CreateStringValue(
@@ -627,7 +580,7 @@ bool SaveBackup(const std::wstring& path, unsigned rowIndex) try {
     return false;
 }
 
-bool LoadBackup(const std::wstring& path, unsigned rowIndex) try {
+bool LoadBackup(const std::wstring& path) try {
     if (path.empty()) {
         return false;
     }
@@ -676,42 +629,40 @@ bool LoadBackup(const std::wstring& path, unsigned rowIndex) try {
         return false;
     }
     std::lock_guard lock(g_storageMutex);
-    return SaveBookmarksLocked(rowIndex, folders);
+    return SaveBookmarksLocked(folders);
 } catch (...) {
     Wh_Log(L"Bookmark backup validation failed: %08X",
            winrt::to_hresult().value);
     return false;
 }
 
-bool AddBookmark(unsigned rowIndex, std::wstring path) {
+bool AddBookmark(std::wstring path) {
     path = NormalizePath(std::move(path));
     if (path.empty() || path.find_first_of(L"\r\n") != std::wstring::npos) {
         return false;
     }
     std::lock_guard lock(g_storageMutex);
-    auto folders = SplitBookmarks(ReadStorageLocked(rowIndex));
+    auto folders = SplitBookmarks(ReadStorageLocked());
     if (folders.size() >= kMaxBookmarks ||
         std::any_of(folders.begin(), folders.end(),
                     [&](const auto& old) { return SamePath(old, path); })) {
         return false;
     }
     folders.push_back(std::move(path));
-    return SaveBookmarksLocked(rowIndex, folders);
+    return SaveBookmarksLocked(folders);
 }
 
-bool RemoveBookmark(unsigned rowIndex, const std::wstring& path) {
+bool RemoveBookmark(const std::wstring& path) {
     std::lock_guard lock(g_storageMutex);
-    auto folders = SplitBookmarks(ReadStorageLocked(rowIndex));
+    auto folders = SplitBookmarks(ReadStorageLocked());
     size_t oldSize = folders.size();
     std::erase_if(folders, [&](const auto& old) { return SamePath(old, path); });
-    return oldSize != folders.size() &&
-           SaveBookmarksLocked(rowIndex, folders);
+    return oldSize != folders.size() && SaveBookmarksLocked(folders);
 }
 
-bool MoveBookmarkToIndex(unsigned rowIndex, const std::wstring& source,
-                         size_t insertionIndex) {
+bool MoveBookmarkToIndex(const std::wstring& source, size_t insertionIndex) {
     std::lock_guard lock(g_storageMutex);
-    auto folders = SplitBookmarks(ReadStorageLocked(rowIndex));
+    auto folders = SplitBookmarks(ReadStorageLocked());
     if (insertionIndex > folders.size()) {
         return false;
     }
@@ -732,7 +683,7 @@ bool MoveBookmarkToIndex(unsigned rowIndex, const std::wstring& source,
     std::wstring moved = std::move(*sourceIt);
     folders.erase(sourceIt);
     folders.insert(folders.begin() + insertionIndex, std::move(moved));
-    return SaveBookmarksLocked(rowIndex, folders);
+    return SaveBookmarksLocked(folders);
 }
 
 std::wstring ButtonLabel(const std::wstring& path) {
@@ -761,10 +712,8 @@ std::wstring TrimSetting(std::wstring value) {
 std::wstring ReadFxSetting(int index, const wchar_t* field) {
     std::wstring name = L"fxCustomFolders[" + std::to_wstring(index) +
                         L"]." + field;
-    const wchar_t* value = Wh_GetStringSetting(name.c_str());
-    std::wstring result = value ? value : L"";
-    Wh_FreeStringSetting(value);
-    return TrimSetting(std::move(result));
+    auto value = WindhawkUtils::StringSetting::make(name.c_str());
+    return TrimSetting(value.get() ? value.get() : L"");
 }
 
 std::wstring ExpandFxPath(const std::wstring& raw) {
@@ -835,6 +784,24 @@ struct ComScope {
     }
 };
 
+struct DialogOperationScope {
+    bool active = false;
+    DialogOperationScope() {
+        std::lock_guard lock(g_dialogMutex);
+        if (!g_unloading) {
+            ++g_activeDialogOperations;
+            active = true;
+        }
+    }
+    ~DialogOperationScope() {
+        if (active) {
+            std::lock_guard lock(g_dialogMutex);
+            --g_activeDialogOperations;
+            g_dialogFinished.notify_all();
+        }
+    }
+};
+
 std::wstring ChooseBackupPath(HWND owner, bool save,
                               const std::wstring& suggestedPath) {
     ComScope com;
@@ -868,7 +835,13 @@ std::wstring ChooseBackupPath(HWND owner, bool save,
             dialog->SetDefaultFolder(folder.get());
         }
     }
-    if (FAILED(dialog->Show(owner))) {
+    if (g_unloading) {
+        return {};
+    }
+    g_threadFileDialog = dialog.get();
+    HRESULT showResult = dialog->Show(owner);
+    g_threadFileDialog = nullptr;
+    if (FAILED(showResult)) {
         return {};
     }
     winrt::com_ptr<IShellItem> selected;
@@ -1036,212 +1009,15 @@ BarState* FindState(const muxc::StackPanel& panel) {
     return nullptr;
 }
 
-BarState* FindCompanionState(const BarState& state) {
-    auto commandBar = state.commandBar.get();
-    if (!commandBar) {
-        return nullptr;
-    }
-    for (auto& other : g_bars) {
-        if (&other != &state && other.rowIndex != state.rowIndex &&
-            other.commandBar.get() == commandBar) {
-            return &other;
-        }
-    }
-    return nullptr;
-}
-
-void AppendElementGeometry(std::wostringstream& out, const wchar_t* name,
-                           const mux::FrameworkElement& element,
-                           const mux::UIElement& root) {
-    out << name << L": ";
-    if (!element) {
-        out << L"unavailable\r\n";
-        return;
-    }
-    auto desired = element.DesiredSize();
-    auto margin = element.Margin();
-    out << L"actual=" << element.ActualWidth() << L"x"
-        << element.ActualHeight() << L" desired=" << desired.Width << L"x"
-        << desired.Height << L" min=" << element.MinWidth() << L"x"
-        << element.MinHeight() << L" margin=" << margin.Left << L","
-        << margin.Top << L"," << margin.Right << L"," << margin.Bottom
-        << L" visible="
-        << (element.Visibility() == mux::Visibility::Visible ? 1 : 0);
-    if (root) {
-        try {
-            auto transform = element.TransformToVisual(root);
-            auto topLeft = transform.TransformPoint({0, 0});
-            auto bottomRight = transform.TransformPoint(
-                {static_cast<float>(element.ActualWidth()),
-                 static_cast<float>(element.ActualHeight())});
-            out << L" rootRect=" << topLeft.X << L"," << topLeft.Y
-                << L".." << bottomRight.X << L"," << bottomRight.Y;
-        } catch (...) {
-            out << L" rootRect=unavailable";
-        }
-    }
-    out << L"\r\n";
-}
-
-std::wstring BuildLayoutDiagnostics(const BarState& state) {
-    std::wostringstream out;
-    out << std::fixed << std::setprecision(1);
-    SYSTEMTIME time{};
-    GetLocalTime(&time);
-    out << L"\r\n=== Explorer bookmarks layout snapshot " << time.wYear
-        << L"-" << time.wMonth << L"-" << time.wDay << L" "
-        << time.wHour << L":" << time.wMinute << L":" << time.wSecond
-        << L" ===\r\n";
-    out << L"mod=0.7.7-double-decker rows=2 process=" << GetCurrentProcessId()
-        << L" thread=" << GetCurrentThreadId()
-        << L" rowHeight=" << kRowHeight
-        << L" rowOpticalLift=" << kRowOpticalLift
-        << L" frameHook=" << (g_frameHooked ? 1 : 0) << L"\r\n";
-
-    auto strip = state.strip.get();
-    auto grid = state.grid.get();
-    auto host = state.hostGrid.get();
-    auto nav = state.navControl.get();
-    auto commandBar = state.commandBar.get();
-    auto buttons = state.buttons.get();
-    auto companion = FindCompanionState(state);
-    auto lowerStrip = companion ? companion->strip.get() : nullptr;
-    auto lowerButtons = companion ? companion->buttons.get() : nullptr;
-    mux::UIElement rootVisual{nullptr};
-    if (strip) {
-        if (auto xamlRoot = strip.XamlRoot()) {
-            rootVisual = xamlRoot.Content();
-            out << L"rasterizationScale=" << xamlRoot.RasterizationScale()
-                << L"\r\n";
-        }
-        HWND window = ExplorerWindowForElement(strip);
-        if (window) {
-            RECT bounds{}, client{};
-            GetWindowRect(window, &bounds);
-            GetClientRect(window, &client);
-            out << L"window screenRect=" << bounds.left << L"," << bounds.top
-                << L".." << bounds.right << L"," << bounds.bottom
-                << L" client=" << client.right << L"x" << client.bottom
-                << L" dpi=" << GetDpiForWindow(window) << L"\r\n";
-            auto folder = CurrentFolder(window);
-            out << L"folder=" << (folder.empty() ? L"<unavailable>" : folder)
-                << L"\r\n";
-        } else {
-            out << L"window=unavailable\r\n";
-        }
-    }
-    AppendElementGeometry(
-        out, L"root",
-        rootVisual ? rootVisual.try_as<mux::FrameworkElement>() : nullptr,
-        rootVisual);
-    AppendElementGeometry(out, L"header host grid", host, rootVisual);
-    if (host) {
-        auto hostRows = host.RowDefinitions();
-        out << L"header rows=" << hostRows.Size() << L"\r\n";
-        for (unsigned i = 0; i < hostRows.Size(); ++i) {
-            auto row = hostRows.GetAt(i);
-            out << L"header row " << i << L" actual=" << row.ActualHeight()
-                << L" requested=" << row.Height().Value
-                << L" type=" << static_cast<int>(row.Height().GridUnitType)
-                << L"\r\n";
-        }
-    }
-    AppendElementGeometry(out, L"navigation", nav, rootVisual);
-    AppendElementGeometry(out, L"grid", grid, rootVisual);
-    AppendElementGeometry(out, L"upper strip", strip, rootVisual);
-    AppendElementGeometry(out, L"upper buttons", buttons, rootVisual);
-    AppendElementGeometry(out, L"lower strip", lowerStrip, rootVisual);
-    AppendElementGeometry(out, L"lower buttons", lowerButtons, rootVisual);
-    AppendElementGeometry(out, L"command bar", commandBar, rootVisual);
-    if (grid) {
-        out << L"grid rows=" << grid.RowDefinitions().Size()
-            << L" children=" << grid.Children().Size()
-            << L" oldMinHeight=" << state.oldGridMinHeight
-            << L" appliedMinHeight=" << state.appliedGridMinHeight << L"\r\n";
-    }
-    if (state.addedRow) {
-        out << L"upper row actualHeight=" << state.addedRow.ActualHeight()
-            << L" requestedHeight=" << state.addedRow.Height().Value
-            << L"\r\n";
-    }
-    if (companion && companion->addedRow) {
-        out << L"lower row actualHeight=" << companion->addedRow.ActualHeight()
-            << L" requestedHeight=" << companion->addedRow.Height().Value
-            << L"\r\n";
-    }
-    if (strip) {
-        out << L"scroll extent=" << strip.ExtentWidth() << L"x"
-            << strip.ExtentHeight() << L" viewport=" << strip.ViewportWidth()
-            << L"x" << strip.ViewportHeight() << L" offset="
-            << strip.HorizontalOffset() << L"," << strip.VerticalOffset()
-            << L"\r\n";
-    }
-    if (buttons) {
-        auto children = buttons.Children();
-        out << L"buttons count=" << children.Size() << L"\r\n";
-        for (unsigned i = 0; i < children.Size(); ++i) {
-            std::wstring label = i == 0 ? L"+" : i == 1 ? L"FX" :
-                                 L"bookmark " + std::to_wstring(i - 1);
-            AppendElementGeometry(
-                out, label.c_str(),
-                children.GetAt(i).try_as<mux::FrameworkElement>(), rootVisual);
-        }
-    }
-    if (lowerStrip) {
-        out << L"lower scroll extent=" << lowerStrip.ExtentWidth() << L"x"
-            << lowerStrip.ExtentHeight() << L" viewport="
-            << lowerStrip.ViewportWidth() << L"x"
-            << lowerStrip.ViewportHeight() << L" offset="
-            << lowerStrip.HorizontalOffset() << L"," <<
-               lowerStrip.VerticalOffset() << L"\r\n";
-    }
-    if (lowerButtons) {
-        auto children = lowerButtons.Children();
-        out << L"lower buttons count=" << children.Size() << L"\r\n";
-        for (unsigned i = 0; i < children.Size(); ++i) {
-            std::wstring label = i == 0 ? L"lower +" :
-                                 L"lower bookmark " + std::to_wstring(i);
-            AppendElementGeometry(
-                out, label.c_str(),
-                children.GetAt(i).try_as<mux::FrameworkElement>(), rootVisual);
-        }
-    }
-    if (strip && lowerStrip && rootVisual) {
-        try {
-            double upperBottom =
-                strip.TransformToVisual(rootVisual).TransformPoint({0, 0}).Y +
-                strip.ActualHeight();
-            double lowerTop = lowerStrip.TransformToVisual(rootVisual)
-                                  .TransformPoint({0, 0}).Y;
-            out << L"gap upperBottom-to-lowerTop=" << lowerTop - upperBottom
-                << L" (negative means overlap)\r\n";
-        } catch (...) {
-            out << L"gap upperBottom-to-lowerTop=unavailable\r\n";
-        }
-    }
-    auto lastStrip = lowerStrip ? lowerStrip : strip;
-    if (lastStrip && commandBar && rootVisual) {
-        try {
-            double stripBottom =
-                lastStrip.TransformToVisual(rootVisual).TransformPoint({0, 0}).Y +
-                lastStrip.ActualHeight();
-            double commandTop = commandBar.TransformToVisual(rootVisual)
-                                    .TransformPoint({0, 0}).Y;
-            out << L"gap stripBottom-to-commandTop="
-                << commandTop - stripBottom
-                << L" (negative means overlap)\r\n";
-        } catch (...) {
-            out << L"gap stripBottom-to-commandTop=unavailable\r\n";
-        }
-    }
-    return out.str();
-}
-
 std::vector<muxc::Button> BarButtons(const muxc::StackPanel& panel) {
     std::vector<muxc::Button> buttons;
-    for (const auto& child : panel.Children()) {
-        if (auto button = child.try_as<muxc::Button>()) {
-            buttons.push_back(button);
+    for (const auto& rowElement : panel.Children()) {
+        if (auto row = rowElement.try_as<muxc::StackPanel>()) {
+            for (const auto& child : row.Children()) {
+                if (auto button = child.try_as<muxc::Button>()) {
+                    buttons.push_back(button);
+                }
+            }
         }
     }
     return buttons;
@@ -1259,6 +1035,26 @@ void RelayoutThreadFrames() {
                 RECT client{};
                 if (GetClientRect(window, &client)) {
                     SendMessageW(window, WM_SIZE,
+                                 IsZoomed(window) ? SIZE_MAXIMIZED
+                                                  : SIZE_RESTORED,
+                                 MAKELPARAM(client.right, client.bottom));
+                }
+            }
+            return TRUE;
+        },
+        0);
+}
+
+// A native WM_SIZE has no callback into the mod and runs after the current
+// XAML layout pass, so row changes do not reenter Explorer's layout code.
+void PostFrameRelayout() {
+    EnumThreadWindows(
+        GetCurrentThreadId(),
+        [](HWND window, LPARAM) -> BOOL {
+            if (IsExplorerFrame(window) && !IsIconic(window)) {
+                RECT client{};
+                if (GetClientRect(window, &client)) {
+                    PostMessageW(window, WM_SIZE,
                                  IsZoomed(window) ? SIZE_MAXIMIZED
                                                   : SIZE_RESTORED,
                                  MAKELPARAM(client.right, client.bottom));
@@ -1291,7 +1087,11 @@ bool DragInProgress(BarState& state) {
 void ClearDropTarget(BarState& state) {
     if (auto button = state.dropTarget.get()) {
         try {
-            button.BorderBrush(state.dropOldBrush);
+            // These bookmark buttons are ours; Tag holds the original brush
+            // on the button itself instead of in thread-local state.
+            auto oldBrush = button.Tag().try_as<muxm::Brush>();
+            button.BorderBrush(oldBrush);
+            button.Tag(nullptr);
             button.BorderThickness(state.dropOldThickness);
         } catch (...) {
             Wh_Log(L"Could not restore bookmark drag border: %08X",
@@ -1299,7 +1099,6 @@ void ClearDropTarget(BarState& state) {
         }
     }
     state.dropTarget = nullptr;
-    state.dropOldBrush = nullptr;
     state.dropAfter = false;
 }
 
@@ -1320,36 +1119,183 @@ void ClearDrag(BarState& state) {
     state.dragging = false;
 }
 
+void UpdateFrameRowCount() {
+    unsigned rows = 0;
+    for (const auto& bar : g_bars) {
+        if (bar.strip.get()) {
+            rows = std::max(rows, bar.rowCount);
+        }
+    }
+    rows = std::min(rows, kMaxRows);
+    if (rows != g_frameRows) {
+        g_frameRows = rows;
+        if (!g_unloading) {
+            PostFrameRelayout();
+        }
+    }
+}
+
+void SetBarRowCount(BarState& state, unsigned count) {
+    count = std::clamp(count, 1u, kMaxRows);
+    if (count == state.rowCount) {
+        return;
+    }
+    const double height = RowAllocation(count);
+    if (state.addedRow) {
+        state.addedRow.Height(
+            mux::GridLength{height, mux::GridUnitType::Pixel});
+    }
+    auto strip = state.strip.get();
+    if (strip) {
+        strip.Height(height);
+    }
+    if (auto grid = state.grid.get()) {
+        if (grid.MinHeight() == state.appliedGridMinHeight) {
+            state.appliedGridMinHeight =
+                std::max(state.oldGridMinHeight,
+                         state.originalGridHeight + height);
+            grid.MinHeight(state.appliedGridMinHeight);
+        }
+        grid.InvalidateMeasure();
+    }
+    if (auto nav = state.navControl.get()) {
+        if (nav.MinHeight() == state.appliedNavMinHeight) {
+            state.appliedNavMinHeight =
+                std::max(state.oldNavMinHeight,
+                         state.originalNavHeight + height);
+            nav.MinHeight(state.appliedNavMinHeight);
+        }
+        nav.InvalidateMeasure();
+    }
+    if (auto host = state.hostGrid.get()) {
+        host.InvalidateMeasure();
+    }
+    state.rowCount = count;
+    if (strip) {
+        UpdateFrameRowCount();
+    }
+}
+
+struct ReflowGuard {
+    bool& active;
+    ~ReflowGuard() { active = false; }
+};
+
+void ReflowPanel(const muxc::StackPanel& panel, double width) try {
+    auto state = FindState(panel);
+    if (!state || state->reflowing || DragInProgress(*state) ||
+        !std::isfinite(width) || width < 1 || width > 100000 ||
+        (std::fabs(state->lastLayoutWidth - width) < 0.5 &&
+         panel.Children().Size() != 0)) {
+        return;
+    }
+    state->reflowing = true;
+    ReflowGuard guard{state->reflowing};
+    auto buttons = BarButtons(panel);
+    if (buttons.empty()) {
+        return;
+    }
+    std::vector<double> widths;
+    widths.reserve(buttons.size());
+    for (const auto& button : buttons) {
+        button.Measure(winrt::Windows::Foundation::Size{10000, kRowHeight});
+        double desired = button.DesiredSize().Width;
+        if (!std::isfinite(desired) || desired <= 0) {
+            auto margin = button.Margin();
+            desired = button.ActualWidth() + margin.Left + margin.Right;
+        }
+        widths.push_back(std::max(1.0, desired));
+    }
+    // Keep strong button refs before detaching the old rows. Reparent only
+    // after all measurements succeed, so a measurement failure leaves the
+    // current visual tree intact.
+    for (const auto& rowElement : panel.Children()) {
+        if (auto row = rowElement.try_as<muxc::StackPanel>()) {
+            row.Children().Clear();
+        }
+    }
+    panel.Children().Clear();
+    muxc::StackPanel row;
+    row.Orientation(muxc::Orientation::Horizontal);
+    panel.Children().Append(row);
+    unsigned rowCount = 1;
+    double used = 0;
+    for (size_t i = 0; i < buttons.size(); ++i) {
+        const double desired = widths[i];
+        if (used > 0 && used + desired > width + 0.5 &&
+            rowCount < kMaxRows) {
+            muxc::StackPanel nextRow;
+            nextRow.Orientation(muxc::Orientation::Horizontal);
+            nextRow.Margin(mux::Thickness{0, kInterRowGap, 0, 0});
+            panel.Children().Append(nextRow);
+            row = nextRow;
+            ++rowCount;
+            used = 0;
+        }
+        row.Children().Append(buttons[i]);
+        used += desired;
+    }
+    state->lastLayoutWidth = width;
+    SetBarRowCount(*state, rowCount);
+} catch (...) {
+    Wh_Log(L"Bookmark auto-row layout failed: %08X",
+           winrt::to_hresult().value);
+}
+
 size_t BookmarkDropIndex(const muxc::StackPanel& panel,
                          winrt::Windows::Foundation::Point position) {
-    auto children = BarButtons(panel);
-    auto state = FindState(panel);
-    const size_t fixedButtons = state ? FixedButtons(*state) : 2;
-    double offset = 0;
-    for (size_t i = 0; i < children.size(); ++i) {
-        auto margin = children[i].Margin();
-        double midpoint = offset + margin.Left + children[i].ActualWidth() / 2;
-        if (i >= fixedButtons && position.X < midpoint) {
-            return i - fixedButtons;
-        }
-        offset += margin.Left + children[i].ActualWidth() + margin.Right;
+    auto rows = panel.Children();
+    if (rows.Size() == 0) {
+        return 0;
     }
-    return children.size() > fixedButtons ? children.size() - fixedButtons : 0;
+    const double pitch = kRowHeight + kInterRowGap;
+    unsigned targetRow = static_cast<unsigned>(std::clamp(
+        static_cast<int>(position.Y / pitch), 0,
+        static_cast<int>(rows.Size()) - 1));
+    size_t buttonIndex = 0;
+    size_t bookmarkIndex = 0;
+    for (unsigned rowIndex = 0; rowIndex < rows.Size(); ++rowIndex) {
+        auto row = rows.GetAt(rowIndex).try_as<muxc::StackPanel>();
+        if (!row) {
+            continue;
+        }
+        double offset = 0;
+        for (const auto& child : row.Children()) {
+            auto button = child.try_as<muxc::Button>();
+            if (!button) {
+                continue;
+            }
+            auto margin = button.Margin();
+            double midpoint = offset + margin.Left +
+                              button.ActualWidth() / 2;
+            if (buttonIndex >= kFixedButtons) {
+                if (rowIndex == targetRow && position.X < midpoint) {
+                    return bookmarkIndex;
+                }
+                ++bookmarkIndex;
+            }
+            offset += margin.Left + button.ActualWidth() + margin.Right;
+            ++buttonIndex;
+        }
+        if (rowIndex == targetRow) {
+            return bookmarkIndex;
+        }
+    }
+    return bookmarkIndex;
 }
 
 void ShowInsertionMark(BarState& state, const muxc::StackPanel& panel,
                        size_t insertionIndex) {
-    // Only bookmarks receive a drop marker; FX exists on the upper row only.
+    // + and FX are fixed controls, so only bookmarks receive a drop marker.
     auto children = BarButtons(panel);
-    const size_t fixedButtons = FixedButtons(state);
-    if (children.size() <= fixedButtons) {
+    if (children.size() <= kFixedButtons) {
         ClearDropTarget(state);
         return;
     }
-    size_t bookmarkCount = children.size() - fixedButtons;
+    size_t bookmarkCount = children.size() - kFixedButtons;
     size_t index = std::min(insertionIndex, bookmarkCount);
     bool after = index == bookmarkCount;
-    auto button = children[fixedButtons + (after ? index - 1 : index)];
+    auto button = children[kFixedButtons + (after ? index - 1 : index)];
     if (!button) {
         ClearDropTarget(state);
         return;
@@ -1360,7 +1306,7 @@ void ShowInsertionMark(BarState& state, const muxc::StackPanel& panel,
     ClearDropTarget(state);
     try {
         state.dropTarget = winrt::make_weak(button);
-        state.dropOldBrush = button.BorderBrush();
+        button.Tag(button.BorderBrush());
         state.dropOldThickness = button.BorderThickness();
         state.dropAfter = after;
         button.BorderBrush(muxm::SolidColorBrush(
@@ -1396,11 +1342,11 @@ struct ScopedIcon {
 
 // Ask Shell for this particular folder's icon. It applies desktop.ini icon
 // customizations and the user's icon cache; USEFILEATTRIBUTES would skip them.
-muxmi::WriteableBitmap FolderBitmap(const std::wstring& path) {
+std::optional<IconPixels> FolderIconPixels(const std::wstring& path) {
     SHFILEINFOW info{};
     if (!SHGetFileInfoW(path.c_str(), 0, &info, sizeof(info),
                         SHGFI_ICON | SHGFI_LARGEICON) || !info.hIcon) {
-        return nullptr;
+        return std::nullopt;
     }
     ScopedIcon shellIcon{info.hIcon};
     try {
@@ -1409,18 +1355,18 @@ muxmi::WriteableBitmap FolderBitmap(const std::wstring& path) {
         if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
                                     CLSCTX_INPROC_SERVER,
                                     IID_PPV_ARGS(factory.put())))) {
-            return nullptr;
+            return std::nullopt;
         }
         winrt::com_ptr<IWICBitmap> source;
         if (FAILED(factory->CreateBitmapFromHICON(shellIcon.value,
                                                   source.put()))) {
-            return nullptr;
+            return std::nullopt;
         }
         UINT width = 0;
         UINT height = 0;
         if (FAILED(source->GetSize(&width, &height)) || width == 0 ||
             height == 0 || width > 256 || height > 256) {
-            return nullptr;
+            return std::nullopt;
         }
         winrt::com_ptr<IWICFormatConverter> converter;
         if (FAILED(factory->CreateFormatConverter(converter.put())) ||
@@ -1428,30 +1374,41 @@ muxmi::WriteableBitmap FolderBitmap(const std::wstring& path) {
                                          GUID_WICPixelFormat32bppBGRA,
                                          WICBitmapDitherTypeNone, nullptr, 0,
                                          WICBitmapPaletteTypeCustom))) {
-            return nullptr;
+            return std::nullopt;
         }
-        muxmi::WriteableBitmap bitmap(static_cast<int>(width),
-                                      static_cast<int>(height));
-        auto buffer = bitmap.PixelBuffer();
         UINT byteCount = width * height * 4;
-        if (buffer.Length() < byteCount) {
-            return nullptr;
+        IconPixels result{static_cast<int>(width), static_cast<int>(height),
+                          std::vector<BYTE>(byteCount)};
+        if (FAILED(converter->CopyPixels(nullptr, width * 4, byteCount,
+                                         result.bytes.data()))) {
+            return std::nullopt;
         }
-        auto access =
-            buffer.as<::Windows::Storage::Streams::IBufferByteAccess>();
-        BYTE* pixels = nullptr;
-        if (FAILED(access->Buffer(&pixels)) || !pixels ||
-            FAILED(converter->CopyPixels(nullptr, width * 4, byteCount,
-                                         pixels))) {
-            return nullptr;
-        }
-        bitmap.Invalidate();
-        return bitmap;
+        return result;
     } catch (...) {
         Wh_Log(L"Failed to load bookmark folder icon: %08X",
                winrt::to_hresult().value);
+        return std::nullopt;
+    }
+}
+
+muxmi::WriteableBitmap BitmapFromPixels(const IconPixels& pixels) try {
+    muxmi::WriteableBitmap bitmap(pixels.width, pixels.height);
+    auto buffer = bitmap.PixelBuffer();
+    if (buffer.Length() < pixels.bytes.size()) {
         return nullptr;
     }
+    auto access = buffer.as<::Windows::Storage::Streams::IBufferByteAccess>();
+    BYTE* destination = nullptr;
+    if (FAILED(access->Buffer(&destination)) || !destination) {
+        return nullptr;
+    }
+    std::memcpy(destination, pixels.bytes.data(), pixels.bytes.size());
+    bitmap.Invalidate();
+    return bitmap;
+} catch (...) {
+    Wh_Log(L"Failed to create bookmark icon bitmap: %08X",
+           winrt::to_hresult().value);
+    return nullptr;
 }
 
 void ForgetCachedIcon(const std::wstring& path) {
@@ -1480,14 +1437,25 @@ muxmi::WriteableBitmap CachedFolderBitmap(const std::wstring& path) {
         it->path = path;
     }
     it->usedAt = now;
-    ULONGLONG lifetime = it->bitmap ? kIconCacheLifetimeMs
-                                    : kFailedIconCacheLifetimeMs;
+    ULONGLONG lifetime = it->pixels ? kIconCacheLifetimeMs
+                                   : kFailedIconCacheLifetimeMs;
     if (!it->attempted || now - it->loadedAt >= lifetime) {
-        it->bitmap = FolderBitmap(path);
+        it->pixels = FolderIconPixels(path);
+        it->bitmap = {};
         it->attempted = true;
         it->loadedAt = now;
     }
-    return it->bitmap;
+    if (!it->pixels) {
+        return nullptr;
+    }
+    if (auto bitmap = it->bitmap.get()) {
+        return bitmap;
+    }
+    auto bitmap = BitmapFromPixels(*it->pixels);
+    if (bitmap) {
+        it->bitmap = winrt::make_weak(bitmap);
+    }
+    return bitmap;
 }
 
 mux::UIElement FolderIcon(const std::wstring& path, FolderStatus status) {
@@ -1522,11 +1490,10 @@ void RefreshPanel(const muxc::StackPanel& panel) {
     if (!state) {
         return;
     }
-    const unsigned rowIndex = state->rowIndex;
     std::wstring storage;
     {
         std::lock_guard lock(g_storageMutex);
-        storage = ReadStorageLocked(rowIndex);
+        storage = ReadStorageLocked();
     }
     ULONGLONG now = GetTickCount64();
     if (DragInProgress(*state) && panel.Children().Size() != 0) {
@@ -1541,6 +1508,9 @@ void RefreshPanel(const muxc::StackPanel& panel) {
     RevokeHandlers(state->driveHandlers);
     RevokeHandlers(state->panelHandlers);
     panel.Children().Clear();
+    muxc::StackPanel firstRow;
+    firstRow.Orientation(muxc::Orientation::Horizontal);
+    panel.Children().Append(firstRow);
     auto weakPanel = winrt::make_weak(panel);
 
     muxc::Button addButton;
@@ -1560,17 +1530,17 @@ void RefreshPanel(const muxc::StackPanel& panel) {
         addButton, winrt::box_value(L"Bookmark this folder"));
     // ContextFlyout opens on right-click; ordinary left-click still adds the
     // current folder.
-    std::wstring backupPath = SuggestedBackupPath(rowIndex);
+    std::wstring backupPath = SuggestedBackupPath();
     muxc::MenuFlyout backupMenu;
     muxc::MenuFlyoutItem saveItem;
     saveItem.Text(L"Save bookmarks");
     muxc::ToolTipService::SetToolTip(
         saveItem, winrt::box_value(L"Choose a JSON backup file"));
-    TrackClick(state->panelHandlers, saveItem,
-               [backupPath, weakPanel, rowIndex](
+    TrackClick(state->panelHandlers, saveItem, [backupPath, weakPanel](
                        const winrt::Windows::Foundation::IInspectable& sender,
                        const mux::RoutedEventArgs&) {
-        if (g_unloading) {
+        DialogOperationScope operation;
+        if (!operation.active) {
             return;
         }
         auto panel = weakPanel.get();
@@ -1579,7 +1549,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
         if (selectedPath.empty() || g_unloading) {
             return;
         }
-        bool ok = SaveBackup(selectedPath, rowIndex);
+        bool ok = SaveBackup(selectedPath);
         if (ok) {
             Wh_Log(L"Bookmarks saved to %ls", selectedPath.c_str());
         } else {
@@ -1597,11 +1567,11 @@ void RefreshPanel(const muxc::StackPanel& panel) {
     loadItem.Text(L"Load bookmarks");
     muxc::ToolTipService::SetToolTip(
         loadItem, winrt::box_value(L"Choose a JSON backup to load"));
-    TrackClick(state->panelHandlers, loadItem,
-               [backupPath, weakPanel, rowIndex](
+    TrackClick(state->panelHandlers, loadItem, [backupPath, weakPanel](
                        const winrt::Windows::Foundation::IInspectable& sender,
                        const mux::RoutedEventArgs&) {
-        if (g_unloading) {
+        DialogOperationScope operation;
+        if (!operation.active) {
             return;
         }
         auto panel = weakPanel.get();
@@ -1610,7 +1580,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
         if (selectedPath.empty() || g_unloading) {
             return;
         }
-        bool ok = LoadBackup(selectedPath, rowIndex);
+        bool ok = LoadBackup(selectedPath);
         if (ok) {
             Wh_Log(L"Bookmarks loaded from %ls", selectedPath.c_str());
         } else {
@@ -1624,14 +1594,14 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                           selectedPath)));
         }
         if (ok) {
-            if (auto livePanel = weakPanel.get()) {
-                RefreshPanel(livePanel);
+            if (auto panel = weakPanel.get()) {
+                RefreshPanel(panel);
             }
         }
     });
     backupMenu.Items().Append(loadItem);
     addButton.ContextFlyout(backupMenu);
-    TrackClick(state->panelHandlers, addButton, [weakPanel, rowIndex](
+    TrackClick(state->panelHandlers, addButton, [weakPanel](
                         const winrt::Windows::Foundation::IInspectable& sender,
                         const mux::RoutedEventArgs&) {
         if (g_unloading) {
@@ -1639,15 +1609,14 @@ void RefreshPanel(const muxc::StackPanel& panel) {
         }
         auto button = sender.try_as<mux::FrameworkElement>();
         HWND window = button ? ExplorerWindowForElement(button) : nullptr;
-        if (window && AddBookmark(rowIndex, CurrentFolder(window))) {
+        if (window && AddBookmark(CurrentFolder(window))) {
             if (auto panel = weakPanel.get()) {
                 RefreshPanel(panel);
             }
         }
     });
-    panel.Children().Append(addButton);
+    firstRow.Children().Append(addButton);
 
-    if (rowIndex == 0) {
     muxc::Button fxButton;
     muxc::TextBlock fxLabel;
     fxLabel.Text(L"FX");
@@ -1664,7 +1633,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                                    kButtonVerticalInset});
     muxc::ToolTipService::SetToolTip(
         fxButton, winrt::box_value(
-            L"FX: left-click for folders; right-click for drives and diagnostics"));
+            L"FX: left-click for folders; right-click for drives"));
     auto weakFxButton = winrt::make_weak(fxButton);
     muxc::MenuFlyout foldersMenu;
     muxc::MenuFlyout drivesMenu;
@@ -1710,51 +1679,9 @@ void RefreshPanel(const muxc::StackPanel& panel) {
             appendLocation(foldersMenu, folder.label, folder.path);
         }
     }
-    std::wstring diagnosticsPath = DiagnosticsPath();
-    muxc::MenuFlyoutItem diagnosticsItem;
-    diagnosticsItem.Text(L"Save layout diagnostics");
-    muxc::ToolTipService::SetToolTip(
-        diagnosticsItem, winrt::box_value(winrt::hstring(
-                             L"Append snapshot to " + diagnosticsPath)));
-    TrackClick(state->panelHandlers, diagnosticsItem,
-               [diagnosticsPath, weakPanel](
-                              const winrt::Windows::Foundation::IInspectable& sender,
-                              const mux::RoutedEventArgs&) {
-        if (g_unloading) {
-            return;
-        }
-        bool ok = false;
-        DWORD error = ERROR_INVALID_STATE;
-        try {
-            auto panel = weakPanel.get();
-            auto state = panel ? FindState(panel) : nullptr;
-            if (state) {
-                ok = AppendDiagnostics(
-                    diagnosticsPath, BuildLayoutDiagnostics(*state));
-                if (!ok) {
-                    error = GetLastError();
-                }
-            }
-        } catch (...) {
-            error = static_cast<DWORD>(winrt::to_hresult().value);
-        }
-        if (ok) {
-            Wh_Log(L"Layout diagnostics saved to %ls",
-                   diagnosticsPath.c_str());
-        } else {
-            Wh_Log(L"Layout diagnostics failed: %lu (%ls)", error,
-                   diagnosticsPath.c_str());
-        }
-        if (auto item = sender.try_as<muxc::MenuFlyoutItem>()) {
-            muxc::ToolTipService::SetToolTip(
-                item, winrt::box_value(winrt::hstring(
-                          std::wstring(ok ? L"Saved to " : L"Save failed: ") +
-                          diagnosticsPath)));
-        }
-    });
-    // Rebuild on every open to reflect newly attached or removed drives.
-    TrackOpening(state->panelHandlers, drivesMenu,
-                 [appendLocation, diagnosticsItem, state](
+    // Build the list when FX opens so newly attached drives appear immediately.
+    // Only local fixed drives are probed; other drives are listed unchecked.
+    TrackOpening(state->panelHandlers, drivesMenu, [appendLocation, state](
                            const winrt::Windows::Foundation::IInspectable& sender,
                            const winrt::Windows::Foundation::IInspectable&) {
         if (g_unloading) {
@@ -1772,8 +1699,6 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                 continue;
             }
             wchar_t drive[] = {static_cast<wchar_t>(L'A' + index), L':', L'\\', L'\0'};
-            // Only local fixed drives are probed; other drives are listed
-            // unchecked.
             if (CheckFolderStatus(drive) == FolderStatus::Missing) {
                 continue;
             }
@@ -1785,14 +1710,14 @@ void RefreshPanel(const muxc::StackPanel& panel) {
             unavailable.IsEnabled(false);
             menu.Items().Append(unavailable);
         }
-        menu.Items().Append(muxc::MenuFlyoutSeparator{});
-        menu.Items().Append(diagnosticsItem);
     });
-    drivesMenu.Items().Append(diagnosticsItem);
+    muxc::MenuFlyoutItem waitingForDrives;
+    waitingForDrives.Text(L"No available drives");
+    waitingForDrives.IsEnabled(false);
+    drivesMenu.Items().Append(waitingForDrives);
     fxButton.Flyout(foldersMenu);
     fxButton.ContextFlyout(drivesMenu);
-    panel.Children().Append(fxButton);
-    }
+    firstRow.Children().Append(fxButton);
 
     for (const auto& path : SplitBookmarks(storage)) {
         FolderStatus status = CheckFolderStatus(path);
@@ -1847,7 +1772,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                     if (point.Properties().IsMiddleButtonPressed()) {
                         args.Handled(true);
                         ClearDrag(*state);
-                        if (RemoveBookmark(state->rowIndex, path)) {
+                        if (RemoveBookmark(path)) {
                             RefreshPanel(panel);
                         }
                     } else if (point.Properties().IsLeftButtonPressed()) {
@@ -1925,7 +1850,7 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                         args.Handled(true);
                         if (position.Y >= 0 && position.Y <= panel.ActualHeight() &&
                             MoveBookmarkToIndex(
-                                state->rowIndex, source,
+                                source,
                                 BookmarkDropIndex(panel, position))) {
                             RefreshPanel(panel);
                         }
@@ -1969,10 +1894,14 @@ void RefreshPanel(const muxc::StackPanel& panel) {
                 }
             }
         });
-        panel.Children().Append(button);
+        firstRow.Children().Append(button);
     }
     state->renderedStorage = std::move(storage);
     state->lastFolderCheckAt = now;
+    state->lastLayoutWidth = 0;
+    if (auto strip = state->strip.get()) {
+        ReflowPanel(panel, strip.ActualWidth());
+    }
 }
 
 muxc::Grid FindNavigationGrid(const mux::DependencyObject& root, int depth) {
@@ -1999,6 +1928,8 @@ void RemoveBarVisuals(BarState& state) {
     auto strip = state.strip.get();
     if (strip) {
         strip.PointerEntered(state.stripPointerToken);
+        strip.SizeChanged(state.stripSizeToken);
+        strip.Loaded(state.stripLoadedToken);
     }
     if (auto grid = state.grid.get()) {
         if (strip) {
@@ -2018,30 +1949,26 @@ void RemoveBarVisuals(BarState& state) {
         if (state.createdFirstRow && rows.Size() == 1) {
             rows.RemoveAt(0);
         }
-        if (state.rowIndex == 0 &&
-            grid.MinHeight() == state.appliedGridMinHeight) {
+        if (grid.MinHeight() == state.appliedGridMinHeight) {
             grid.MinHeight(state.oldGridMinHeight);
         }
         grid.InvalidateMeasure();
     }
     if (auto nav = state.navControl.get()) {
-        if (state.rowIndex == 0 &&
-            nav.MinHeight() == state.appliedNavMinHeight) {
+        if (nav.MinHeight() == state.appliedNavMinHeight) {
             nav.MinHeight(state.oldNavMinHeight);
         }
         nav.InvalidateMeasure();
     }
-    if (state.rowIndex == 0) {
-        if (auto host = state.hostGrid.get()) {
-            auto rows = host.RowDefinitions();
-            if (state.commandRow && rows.Size() == 3 &&
-                rows.GetAt(2) == state.commandRow &&
-                state.commandRow.Height().GridUnitType ==
-                    mux::GridUnitType::Auto) {
-                state.commandRow.Height(state.oldCommandRowHeight);
-            }
-            host.InvalidateMeasure();
+    if (auto host = state.hostGrid.get()) {
+        auto rows = host.RowDefinitions();
+        if (state.commandRow && rows.Size() == 3 &&
+            rows.GetAt(2) == state.commandRow &&
+            state.commandRow.Height().GridUnitType ==
+                mux::GridUnitType::Auto) {
+            state.commandRow.Height(state.oldCommandRowHeight);
         }
+        host.InvalidateMeasure();
     }
     state.grid = nullptr;
     state.hostGrid = nullptr;
@@ -2049,181 +1976,180 @@ void RemoveBarVisuals(BarState& state) {
     state.strip = nullptr;
     state.buttons = nullptr;
     state.stripPointerToken = {};
+    state.stripSizeToken = {};
+    state.stripLoadedToken = {};
     state.addedRow = nullptr;
     state.commandRow = nullptr;
     state.createdFirstRow = false;
+    state.originalGridHeight = 0;
+    state.originalNavHeight = 0;
+    state.rowCount = 1;
+    state.lastLayoutWidth = 0;
+    state.reflowing = false;
     state.renderedStorage.clear();
     state.lastFolderCheckAt = 0;
     ClearDrag(state);
     state.suppressClick.clear();
+    if (!g_unloading) {
+        UpdateFrameRowCount();
+    }
 }
 
-void TryInstallBars(const muxc::CommandBar& commandBar);
+void TryInstallBar(const muxc::CommandBar& commandBar);
 
-void TryInstallBars(const muxc::CommandBar& commandBar) {
-    BarState* upper = nullptr;
-    BarState* lower = nullptr;
+void TryInstallBar(const muxc::CommandBar& commandBar) {
+    BarState* state = nullptr;
     try {
-        if (g_unloading || !g_frameHooked) {
+    if (g_unloading || !g_frameHooked) {
+        return;
+    }
+    auto root = commandBar.XamlRoot();
+    if (!root || !root.Content()) {
+        return;
+    }
+    auto grid = FindNavigationGrid(root.Content(), 0);
+    if (!grid) {
+        return;
+    }
+
+    for (auto& item : g_bars) {
+        if (item.commandBar.get() == commandBar) {
+            state = &item;
+            break;
+        }
+    }
+    if (!state || (state->strip.get() && state->grid.get() == grid)) {
+        return;
+    }
+    // Another tab's command bar may already own the row in this grid.
+    for (const auto& child : grid.Children()) {
+        auto element = child.try_as<mux::FrameworkElement>();
+        if (element && element.Name() == kBarName) {
             return;
         }
-        auto root = commandBar.XamlRoot();
-        if (!root || !root.Content()) {
-            return;
-        }
-        auto grid = FindNavigationGrid(root.Content(), 0);
-        if (!grid) {
-            return;
-        }
-        for (auto& item : g_bars) {
-            if (item.commandBar.get() == commandBar) {
-                if (item.rowIndex == 0) {
-                    upper = &item;
-                } else {
-                    lower = &item;
-                }
-            }
-        }
-        if (!upper || !lower) {
-            return;
-        }
-        if (upper->strip.get() && lower->strip.get() &&
-            upper->grid.get() == grid && lower->grid.get() == grid) {
-            return;
-        }
-        // Another tab may already own this grid. Ignore only our own strips
-        // while repairing a partial installation.
-        for (const auto& child : grid.Children()) {
-            auto element = child.try_as<mux::FrameworkElement>();
-            if (element &&
-                (element.Name() == kBarName ||
-                 element.Name() == kSecondBarName) &&
-                child != upper->strip.get() &&
-                child != lower->strip.get()) {
+    }
+    if (state->addedRow || state->strip.get()) {
+        // Explorer rebuilt its navigation bar; undo the stale installation.
+        RemoveBarVisuals(*state);
+    }
+
+    auto nav = muxm::VisualTreeHelper::GetParent(grid)
+                   .try_as<mux::FrameworkElement>();
+    auto host = nav ? muxm::VisualTreeHelper::GetParent(nav)
+                          .try_as<muxc::Grid>()
+                    : nullptr;
+    if (!host) {
+        return;
+    }
+    auto hostRows = host.RowDefinitions();
+    // The measured Explorer header has [Auto, *, *] with navigation in row 1.
+    // Leave unknown Windows builds untouched instead of altering another Grid.
+    if (hostRows.Size() != 3 || muxc::Grid::GetRow(nav) != 1 ||
+        hostRows.GetAt(0).Height().GridUnitType != mux::GridUnitType::Auto ||
+        hostRows.GetAt(1).Height().GridUnitType != mux::GridUnitType::Star ||
+        hostRows.GetAt(2).Height().GridUnitType != mux::GridUnitType::Star) {
+        return;
+    }
+    const double originalGridHeight =
+        std::max<double>(grid.ActualHeight(), grid.DesiredSize().Height);
+    const double originalNavHeight =
+        std::max<double>(nav.ActualHeight(), nav.DesiredSize().Height);
+    muxc::RowDefinition row;
+    row.Height(mux::GridLength{kRowHeight, mux::GridUnitType::Pixel});
+    auto rows = grid.RowDefinitions();
+    state->grid = winrt::make_weak(grid);
+    if (rows.Size() == 0) {
+        muxc::RowDefinition originalRow;
+        rows.Append(originalRow);
+        state->createdFirstRow = true;
+    }
+    unsigned rowIndex = rows.Size();
+    state->hostGrid = winrt::make_weak(host);
+    state->addedRow = row;
+    rows.Append(row);
+
+    // Otherwise the two equal star rows each consume half of the extra host
+    // height. Auto keeps Explorer's command row at its natural 48 units.
+    state->commandRow = hostRows.GetAt(2);
+    state->oldCommandRowHeight = state->commandRow.Height();
+    state->commandRow.Height(
+        mux::GridLength{1.0, mux::GridUnitType::Auto});
+
+    muxc::StackPanel buttons;
+    buttons.Orientation(muxc::Orientation::Vertical);
+    muxc::ScrollViewer strip;
+    strip.Name(kBarName);
+    strip.Height(kRowHeight);
+    // Move the scroll and hit-test surface without changing row allocation.
+    muxm::TranslateTransform stripOffset;
+    stripOffset.Y(-kRowOpticalLift);
+    strip.RenderTransform(stripOffset);
+    // A visible scrollbar would consume the fixed row height and clip the
+    // buttons. Horizontal panning remains available when row four overflows.
+    strip.HorizontalScrollBarVisibility(muxc::ScrollBarVisibility::Hidden);
+    strip.VerticalScrollBarVisibility(muxc::ScrollBarVisibility::Disabled);
+    strip.HorizontalScrollMode(muxc::ScrollMode::Enabled);
+    strip.VerticalScrollMode(muxc::ScrollMode::Disabled);
+    strip.Content(buttons);
+    muxc::Grid::SetRow(strip, static_cast<int>(rowIndex));
+    muxc::Grid::SetColumnSpan(
+        strip, static_cast<int>(std::max(1u, grid.ColumnDefinitions().Size())));
+
+    state->navControl = winrt::make_weak(nav);
+    state->strip = winrt::make_weak(strip);
+    state->buttons = winrt::make_weak(buttons);
+    state->oldGridMinHeight = grid.MinHeight();
+    state->originalGridHeight = originalGridHeight;
+    state->originalNavHeight = originalNavHeight;
+    state->appliedGridMinHeight =
+        std::max(state->oldGridMinHeight, originalGridHeight + kRowHeight);
+    grid.MinHeight(state->appliedGridMinHeight);
+    if (nav) {
+        state->oldNavMinHeight = nav.MinHeight();
+        state->appliedNavMinHeight =
+            std::max(state->oldNavMinHeight, originalNavHeight + kRowHeight);
+        nav.MinHeight(state->appliedNavMinHeight);
+    }
+
+    grid.Children().Append(strip);
+    grid.InvalidateMeasure();
+    host.InvalidateMeasure();
+    auto weakButtons = winrt::make_weak(buttons);
+    state->stripPointerToken =
+        strip.PointerEntered([weakButtons](auto const&, auto const&) {
+            auto panel = weakButtons.get();
+            if (!panel) {
                 return;
             }
-        }
-        // Row definitions must be removed from the end back to the beginning.
-        if (lower->addedRow || lower->strip.get()) {
-            RemoveBarVisuals(*lower);
-        }
-        if (upper->addedRow || upper->strip.get()) {
-            RemoveBarVisuals(*upper);
-        }
-
-        auto nav = muxm::VisualTreeHelper::GetParent(grid)
-                       .try_as<mux::FrameworkElement>();
-        auto host = nav ? muxm::VisualTreeHelper::GetParent(nav)
-                              .try_as<muxc::Grid>()
-                        : nullptr;
-        if (!host) {
-            return;
-        }
-        auto hostRows = host.RowDefinitions();
-        // Explorer's measured header uses [Auto, *, *] and puts the
-        // navigation element in row 1. Unknown layouts are left alone.
-        if (hostRows.Size() != 3 || muxc::Grid::GetRow(nav) != 1 ||
-            hostRows.GetAt(0).Height().GridUnitType != mux::GridUnitType::Auto ||
-            hostRows.GetAt(1).Height().GridUnitType != mux::GridUnitType::Star ||
-            hostRows.GetAt(2).Height().GridUnitType != mux::GridUnitType::Star) {
-            return;
-        }
-        const double originalGridHeight =
-            std::max<double>(grid.ActualHeight(), grid.DesiredSize().Height);
-        const double originalNavHeight =
-            std::max<double>(nav.ActualHeight(), nav.DesiredSize().Height);
-        auto rows = grid.RowDefinitions();
-        if (rows.Size() == 0) {
-            muxc::RowDefinition originalRow;
-            rows.Append(originalRow);
-            upper->createdFirstRow = true;
-        }
-        upper->hostGrid = winrt::make_weak(host);
-        upper->commandRow = hostRows.GetAt(2);
-        upper->oldCommandRowHeight = upper->commandRow.Height();
-        // With two star rows, Explorer would give half the added height to
-        // its command row. Auto retains the stock command height.
-        upper->commandRow.Height(
-            mux::GridLength{1.0, mux::GridUnitType::Auto});
-        for (BarState* state : {upper, lower}) {
-            muxc::RowDefinition row;
-            row.Height(mux::GridLength{
-                kRowHeight + (state->rowIndex == 0 ? 0 : kInterRowGap),
-                mux::GridUnitType::Pixel});
-            unsigned gridRow = rows.Size();
-            state->grid = winrt::make_weak(grid);
-            state->navControl = winrt::make_weak(nav);
-            state->addedRow = row;
-            rows.Append(row);
-
-            muxc::StackPanel buttons;
-            buttons.Orientation(muxc::Orientation::Horizontal);
-            muxc::ScrollViewer strip;
-            strip.Name(state->rowIndex == 0 ? kBarName : kSecondBarName);
-            strip.Height(kRowHeight);
-            if (state->rowIndex == 1) {
-                strip.VerticalAlignment(mux::VerticalAlignment::Bottom);
+            RefreshPanel(panel);
+        });
+    state->stripSizeToken = strip.SizeChanged(
+        [weakButtons](auto const&, const mux::SizeChangedEventArgs& args) {
+            if (auto panel = weakButtons.get()) {
+                ReflowPanel(panel, args.NewSize().Width);
             }
-            muxm::TranslateTransform stripOffset;
-            stripOffset.Y(-kRowOpticalLift);
-            strip.RenderTransform(stripOffset);
-            // A visible scrollbar would consume the fixed row height and
-            // clip the buttons. Horizontal panning remains available.
-            strip.HorizontalScrollBarVisibility(muxc::ScrollBarVisibility::Hidden);
-            strip.VerticalScrollBarVisibility(muxc::ScrollBarVisibility::Disabled);
-            strip.HorizontalScrollMode(muxc::ScrollMode::Enabled);
-            strip.VerticalScrollMode(muxc::ScrollMode::Disabled);
-            strip.Content(buttons);
-            muxc::Grid::SetRow(strip, static_cast<int>(gridRow));
-            muxc::Grid::SetColumnSpan(
-                strip,
-                static_cast<int>(std::max(1u, grid.ColumnDefinitions().Size())));
-            state->strip = winrt::make_weak(strip);
-            state->buttons = winrt::make_weak(buttons);
-            grid.Children().Append(strip);
-
-            auto weakButtons = winrt::make_weak(buttons);
-            state->stripPointerToken =
-                strip.PointerEntered([weakButtons](auto const&, auto const&) {
-                    if (auto panel = weakButtons.get()) {
-                        RefreshPanel(panel);
+        });
+    state->stripLoadedToken = strip.Loaded(
+        [weakButtons](auto const&, auto const&) {
+            if (auto panel = weakButtons.get()) {
+                if (auto bar = FindState(panel)) {
+                    if (auto strip = bar->strip.get()) {
+                        ReflowPanel(panel, strip.ActualWidth());
                     }
-                });
-        }
-        // Reserve both rows together. Updating min height once prevents the
-        // second row from reusing the first row's still-stale ActualHeight.
-        upper->oldGridMinHeight = grid.MinHeight();
-        upper->appliedGridMinHeight =
-            std::max(upper->oldGridMinHeight,
-                     originalGridHeight + kTotalRowHeight);
-        grid.MinHeight(upper->appliedGridMinHeight);
-        if (nav) {
-            upper->oldNavMinHeight = nav.MinHeight();
-            upper->appliedNavMinHeight =
-                std::max(upper->oldNavMinHeight,
-                         originalNavHeight + kTotalRowHeight);
-            nav.MinHeight(upper->appliedNavMinHeight);
-        }
-        grid.InvalidateMeasure();
-        host.InvalidateMeasure();
-        if (auto panel = upper->buttons.get()) {
-            RefreshPanel(panel);
-        }
-        if (auto panel = lower->buttons.get()) {
-            RefreshPanel(panel);
-        }
-        RelayoutThreadFrames();
-    } catch (...) {
-        Wh_Log(L"Two-row bookmarks insertion failed: %08X",
-               winrt::to_hresult().value);
-        for (BarState* state : {lower, upper}) {
-            if (state) {
-                try {
-                    RemoveBarVisuals(*state);
-                } catch (...) {
-                    Wh_Log(L"Two-row bookmarks rollback failed: %08X",
-                           winrt::to_hresult().value);
                 }
+            }
+        });
+    RefreshPanel(buttons);
+    UpdateFrameRowCount();
+    } catch (...) {
+        Wh_Log(L"Bookmarks bar insertion failed: %08X",
+               winrt::to_hresult().value);
+        if (state) {
+            try {
+                RemoveBarVisuals(*state);
+            } catch (...) {
+                Wh_Log(L"Bookmarks bar rollback failed: %08X",
+                       winrt::to_hresult().value);
             }
         }
     }
@@ -2235,8 +2161,8 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
         return;
     }
     for (const auto& state : g_bars) {
-        if (state.rowIndex == 0 && state.commandBar.get() == commandBar) {
-            TryInstallBars(commandBar);
+        if (state.commandBar.get() == commandBar) {
+            TryInstallBar(commandBar);
             return;
         }
     }
@@ -2249,21 +2175,49 @@ void TrackCommandBar(const muxc::CommandBar& commandBar) try {
         RevokeHandlers(state.panelHandlers);
         return true;
     });
+    UpdateFrameRowCount();
     g_bars.emplace_back();
-    BarState& upper = g_bars.back();
-    upper.rowIndex = 0;
-    upper.commandBar = winrt::make_weak(commandBar);
-    g_bars.emplace_back();
-    BarState& lower = g_bars.back();
-    lower.rowIndex = 1;
-    lower.commandBar = winrt::make_weak(commandBar);
-    auto weakBar = upper.commandBar;
-    upper.loadedToken = commandBar.Loaded([weakBar](auto const&, auto const&) {
+    BarState& state = g_bars.back();
+    state.commandBar = winrt::make_weak(commandBar);
+    auto weakBar = state.commandBar;
+    state.loadedToken = commandBar.Loaded([weakBar](auto const&, auto const&) {
         if (auto bar = weakBar.get()) {
-            TryInstallBars(bar);
+            TryInstallBar(bar);
         }
     });
-    TryInstallBars(commandBar);
+    state.unloadedToken = commandBar.Unloaded(
+        [weakBar](auto const&, auto const&) {
+            auto bar = weakBar.get();
+            // WinUI can raise Unloaded after a quick re-add has already raised
+            // Loaded; keep the bar while its command bar is in the tree.
+            if (!bar || bar.IsLoaded()) {
+                return;
+            }
+            for (auto& state : g_bars) {
+                if (state.commandBar.get() == bar) {
+                    // Another tab's command bar can share a header that stays
+                    // on screen; keep the bar there instead of removing it.
+                    if (auto strip = state.strip.get();
+                        strip && strip.IsLoaded()) {
+                        break;
+                    }
+                    try {
+                        RemoveBarVisuals(state);
+                    } catch (...) {
+                        Wh_Log(L"Bookmarks bar unload cleanup failed: %08X",
+                               winrt::to_hresult().value);
+                    }
+                    break;
+                }
+            }
+            if (std::none_of(g_bars.begin(), g_bars.end(),
+                             [](const BarState& state) {
+                                 return !!state.strip.get();
+                             })) {
+                g_iconCache.clear();
+            }
+        });
+    TryInstallBar(commandBar);
 } catch (...) {
     Wh_Log(L"Bookmarks bar tracking failed: %08X",
            winrt::to_hresult().value);
@@ -2307,9 +2261,7 @@ void ScanCurrentThreadForCommandBars() try {
     }
     std::vector<winrt::weak_ref<muxc::CommandBar>> knownBars;
     for (const auto& state : g_bars) {
-        if (state.rowIndex == 0) {
-            knownBars.push_back(state.commandBar);
-        }
+        knownBars.push_back(state.commandBar);
     }
     for (const auto& weakBar : knownBars) {
         if (auto bar = weakBar.get()) {
@@ -2321,7 +2273,7 @@ void ScanCurrentThreadForCommandBars() try {
         ScanXamlRootForCommandBars(element);
     }
 } catch (...) {
-    Wh_Log(L"Double-decker bar scan failed: %08X",
+    Wh_Log(L"Bookmarks bar scan failed: %08X",
            winrt::to_hresult().value);
 }
 
@@ -2336,39 +2288,22 @@ void WINAPI CommandBarSetterHook(void* self, void* value) {
     }
 }
 
-// Two 38-unit strips, a 2-unit gap, and the measured 6-unit overhang reserve
-// 84 units at 96 DPI. The getter returns a fresh physical-pixel size on each
-// call; the host ratio scales the reservation with DPI.
+// The stock header rows are 38/48/48 at 96 DPI. The navigation
+// Grid overhangs its row by 3 units at both ends. For N wrapped rows, reserve
+// 38*N + 2*(N-1) + 6 = 40*N + 4 units. The original getter returns a fresh
+// physical-pixel size on each call; the ratio scales with DPI.
 using DesiredSizeGetter = HRESULT(WINAPI*)(void*, SIZE*);
 DesiredSizeGetter g_desiredSizeOriginal = nullptr;
 HRESULT WINAPI DesiredSizeHook(void* self, SIZE* size) {
     HRESULT result = g_desiredSizeOriginal(self, size);
-    if (FAILED(result) || !size || g_unloading) {
-        return result;
-    }
-    bool hasCompleteBar = false;
-    for (const auto& upper : g_bars) {
-        if (upper.rowIndex != 0 || !upper.strip.get()) {
-            continue;
-        }
-        for (const auto& lower : g_bars) {
-            if (lower.rowIndex == 1 && lower.strip.get() &&
-                lower.commandBar.get() == upper.commandBar.get()) {
-                hasCompleteBar = true;
-                break;
-            }
-        }
-        if (hasCompleteBar) {
-            break;
-        }
-    }
-    if (!hasCompleteBar) {
+    if (FAILED(result) || !size || g_unloading || g_frameRows == 0) {
         return result;
     }
     const LONG originalHeight = size->cy;
     const bool eligible = originalHeight >= 80 && originalHeight <= 600;
+    const unsigned frameRows = std::min(g_frameRows, kMaxRows);
     const LONG extra = eligible
-                           ? MulDiv(originalHeight, kHostExtraAt96Dpi,
+                           ? MulDiv(originalHeight, HostExtraAt96Dpi(frameRows),
                                     kMeasuredHostHeightAt96Dpi)
                            : 0;
     size->cy += extra;
@@ -2383,9 +2318,11 @@ bool HookExplorerFrame(bool apply) {
     if (!module) {
         return true;
     }
+    // Bound symbol resolution to one attempt for this Explorer process;
+    // repeated failures would invalidate Windhawk's symbol cache.
     bool expected = false;
-    if (!g_frameHooked.compare_exchange_strong(expected, true)) {
-        return true;
+    if (!g_frameHookAttempted.compare_exchange_strong(expected, true)) {
+        return g_frameHooked;
     }
     // Windows.UI.FileExplorer.dll
     WindhawkUtils::SYMBOL_HOOK hook[] = {{
@@ -2393,10 +2330,10 @@ bool HookExplorerFrame(bool apply) {
         &g_desiredSizeOriginal, DesiredSizeHook}};
     if (!WindhawkUtils::HookSymbols(module, hook, ARRAYSIZE(hook)) ||
         !g_desiredSizeOriginal) {
-        g_frameHooked = false;
         Wh_Log(L"File Explorer frame size symbol unavailable");
         return false;
     }
+    g_frameHooked = true;
     if (apply) {
         Wh_ApplyHookOperations();
     }
@@ -2411,9 +2348,10 @@ bool HookExplorerExtension(bool apply) {
     if (!module) {
         return true;
     }
+    // Bound symbol resolution to one attempt for this Explorer process.
     bool expected = false;
-    if (!g_extensionHooked.compare_exchange_strong(expected, true)) {
-        return true;
+    if (!g_extensionHookAttempted.compare_exchange_strong(expected, true)) {
+        return g_extensionHooked;
     }
     // FileExplorerExtensions.dll
     WindhawkUtils::SYMBOL_HOOK hook[] = {{
@@ -2422,10 +2360,10 @@ bool HookExplorerExtension(bool apply) {
         &g_commandBarSetterOriginal, CommandBarSetterHook}};
     if (!WindhawkUtils::HookSymbols(module, hook, ARRAYSIZE(hook)) ||
         !g_commandBarSetterOriginal) {
-        g_extensionHooked = false;
         Wh_Log(L"File Explorer command bar symbol unavailable");
         return false;
     }
+    g_extensionHooked = true;
     if (apply) {
         Wh_ApplyHookOperations();
     }
@@ -2437,7 +2375,7 @@ LoadLibraryExW_t g_loadLibraryOriginal = nullptr;
 HMODULE WINAPI LoadLibraryExWHook(LPCWSTR file, HANDLE handle, DWORD flags) {
     HMODULE module = g_loadLibraryOriginal(file, handle, flags);
     if (module && file && !g_unloading &&
-        (!g_extensionHooked || !g_frameHooked)) {
+        (!g_extensionHookAttempted || !g_frameHookAttempted)) {
         const wchar_t* base = file;
         for (const wchar_t* p = file; *p; ++p) {
             if (*p == L'\\' || *p == L'/') {
@@ -2457,13 +2395,11 @@ void ForExplorerWindows(void (*callback)());
 
 void CleanupCurrentThread() {
     bool hadBars = !g_bars.empty();
-    for (auto it = g_bars.rbegin(); it != g_bars.rend(); ++it) {
-        auto& state = *it;
+    for (auto& state : g_bars) {
         try {
-            if (state.rowIndex == 0) {
-                if (auto commandBar = state.commandBar.get()) {
-                    commandBar.Loaded(state.loadedToken);
-                }
+            if (auto commandBar = state.commandBar.get()) {
+                commandBar.Loaded(state.loadedToken);
+                commandBar.Unloaded(state.unloadedToken);
             }
             RemoveBarVisuals(state);
         } catch (...) {
@@ -2540,6 +2476,17 @@ void ForExplorerWindows(void (*callback)()) {
         reinterpret_cast<LPARAM>(callback));
 }
 
+void BeginUnloading() {
+    std::lock_guard lock(g_dialogMutex);
+    g_unloading = true;
+}
+
+void CloseActiveDialogCurrentThread() {
+    if (g_threadFileDialog) {
+        g_threadFileDialog->Close(HRESULT_FROM_WIN32(ERROR_CANCELLED));
+    }
+}
+
 BOOL Wh_ModInit() {
     HMODULE kernelBase = GetModuleHandleW(L"kernelbase.dll");
     auto loadLibraryExW = kernelBase
@@ -2552,6 +2499,7 @@ BOOL Wh_ModInit() {
         Wh_Log(L"Could not hook kernelbase LoadLibraryExW");
         return FALSE;
     }
+    // Ensure the frame symbol can be hooked before Explorer creates a window.
     if (!GetModuleHandleW(L"Windows.UI.FileExplorer.dll")) {
         LoadLibraryExW(L"Windows.UI.FileExplorer.dll", nullptr,
                        LOAD_LIBRARY_SEARCH_SYSTEM32);
@@ -2570,11 +2518,18 @@ void Wh_ModAfterInit() {
 }
 
 void Wh_ModBeforeUninit() {
-    g_unloading = true;
+    BeginUnloading();
 }
 
 void Wh_ModUninit() {
-    g_unloading = true;
+    BeginUnloading();
+    for (;;) {
+        ForExplorerWindows(CloseActiveDialogCurrentThread);
+        std::unique_lock lock(g_dialogMutex);
+        if (g_activeDialogOperations == 0) {
+            break;
+        }
+        g_dialogFinished.wait_for(lock, std::chrono::milliseconds(100));
+    }
     ForExplorerWindows(CleanupCurrentThread);
-    CleanupCurrentThread();
 }
