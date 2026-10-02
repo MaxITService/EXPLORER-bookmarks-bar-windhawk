@@ -1,10 +1,17 @@
 // Standalone checks of the real coordinator and native frame lifetime code.
 // WH_EDITING stubs Windhawk; this executable never installs hooks in Explorer.
+#include "allocation-fixture.h"
 #include "windhawk-fixture.h"
-#include "../mods/explorer-folder-bookmarks-bar.wh.cpp"
+#include "platform-failure-fixture.h"
+#include "runtime-gap-fixture.h"
+#define BOOKMARK_EVENT_PLATFORM_ONLY
+#include "event-gap-fixture.h"
+#undef BOOKMARK_EVENT_PLATFORM_ONLY
+#include <explorer-folder-bookmarks-bar.wh.cpp>
 #include <cstdio>
 #include <cstdlib>
 #include <thread>
+#include <werapi.h>
 
 void Require(bool condition, const char* message) {
     if (!condition) {
@@ -792,9 +799,125 @@ void CheckPoliciesAndWindowsView() {
     std::puts("PASS: isolated registry policies and Windows recent clear/hide/reuse filtering");
 }
 
-int main() {
+DWORD WINAPI ThrowingWorker(void*) {
+    return RunWindowsRecentWorker([]() -> std::vector<TimedFolder> {
+        ++scanCount;
+        SetEvent(scanEntered);
+        Require(WaitForSingleObject(releaseScan, 5000) == WAIT_OBJECT_0,
+                "throwing scan gate timed out");
+        throw winrt::hresult_error(E_FAIL);
+    });
+}
+
+void CheckWorkerFailuresAndStop() {
+    fixture::Reset();
+    StopWindowsRecentWorker(); // Repeated stop must remain safe.
+    Require(!StartWindowsRecentWorkerLocked(), "stopped worker restarted during unload state");
+    g_windowsRecentStopping = false;
+    g_unloading = true;
+    Require(!StartWindowsRecentWorkerLocked(), "worker started during mod unload");
+    g_unloading = false;
+    scanEntered = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    releaseScan = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    g_windowsRecentWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    g_windowsRecentsActive = true;
+    g_windowsRecentsScanned = false;
+    g_windowsRecentsRequested = false;
+    g_windowsRecentsScanning = false;
+    g_windowsRecents = {{L"C:\\previous", 1}};
+    g_windowsRecentThread = CreateThread(nullptr, 0, ThrowingWorker, nullptr, 0, nullptr);
+    Require(scanEntered && releaseScan && g_windowsRecentWake && g_windowsRecentThread,
+            "throwing worker setup failed");
+    CachedWindowsRecentFolders();
+    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0, "throwing scan did not start");
+    SetEvent(releaseScan);
+    WaitForScanEnd();
+    Require(CachedWindowsRecentFolders().empty() && g_windowsRecentsScanned,
+            "failed scan was not recovered as empty ready snapshot");
+    {
+        std::lock_guard lock(g_windowsRecentsMutex);
+        g_windowsRecentsScannedAt = GetTickCount64() - kWindowsRecentCacheMs;
+    }
+    CachedWindowsRecentFolders();
+    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0,
+            "expired snapshot did not request retry");
+    HANDLE stopped = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    std::thread stopper([&] { StopWindowsRecentWorker(); SetEvent(stopped); });
+    Require(WaitForSingleObject(stopped, 150) == WAIT_TIMEOUT,
+            "stop did not wait for pending scanner");
+    SetEvent(releaseScan);
+    Require(WaitForSingleObject(stopped, 5000) == WAIT_OBJECT_0, "worker stop failed after releasing scanner");
+    stopper.join();
+    Require(!g_windowsRecentThread && !g_windowsRecentWake && !g_windowsRecentsScanning &&
+            !g_windowsRecentsRequested, "stop leaked worker state");
+    CloseHandle(stopped);
+    CloseHandle(scanEntered);
+    CloseHandle(releaseScan);
+    g_windowsRecentsActive = false;
+    fixture::Reset();
+    std::puts("PASS: scan exceptions, cache-expiry retry, blocked scanner join and restart guards");
+}
+
+void CheckIconPixelsAndCaches() {
+    BackupFixture scratch;
+    const auto pixels = FolderIconPixels(scratch.directory);
+    Require(pixels && pixels->width > 0 && pixels->height > 0 &&
+            pixels->bytes.size() == static_cast<size_t>(pixels->width * pixels->height * 4),
+            "real Shell folder icon did not decode to BGRA pixels");
+    const auto missing = scratch.directory + L"\\absent";
+    Require(!FolderIconPixels(missing), "nonexistent path yielded icon pixels");
+    g_iconCache.clear();
+    Require(!CachedFolderBitmap(missing) && g_iconCache.size() == 1 &&
+            g_iconCache.front().attempted && !g_iconCache.front().pixels,
+            "failed icon request was not cached");
+    const auto loaded = FolderIconLoadedAt(missing);
+    Require(loaded && !CachedFolderBitmap(missing) && FolderIconLoadedAt(missing) == loaded,
+            "failed icon cache ignored retry interval");
+    for (size_t i = 1; i <= kMaxCachedIcons; ++i) {
+        CachedFolderBitmap(missing + std::to_wstring(i));
+    }
+    Require(g_iconCache.size() == kMaxCachedIcons && FolderIconLoadedAt(missing) == 0,
+            "icon cache exceeded cap or retained oldest entry");
+    const auto cached = g_iconCache.front().path;
+    ForgetCachedIcon(cached);
+    Require(g_iconCache.size() == kMaxCachedIcons - 1 && FolderIconLoadedAt(cached) == 0,
+            "explicit icon invalidation failed");
+    Require(FolderTooltip(L"C:\\folder", FolderStatus::Missing, false).find(L"Folder not found") != std::wstring::npos &&
+            FolderTooltip(L"C:\\folder", FolderStatus::Available, true).find(L"Drag onto") != std::wstring::npos &&
+            FolderTooltip(L"C:\\folder", FolderStatus::Unknown, false).find(L"Folder not found") == std::wstring::npos,
+            "folder tooltip status/recent instructions failed");
+    g_iconCache.clear();
+    std::puts("PASS: real Shell icon decoding, failed icon cache, eviction, invalidation and tooltips");
+}
+
+#include "com-fixture.h"
+#include "native-checks.h"
+#include "platform-failure-checks.h"
+#include "allocation-checks.h"
+#include "branch-gap-checks.h"
+#include "runtime-gap-checks.h"
+#include "xaml-checks.h"
+
+int main(int argc, char** argv) {
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    std::setvbuf(stdout, nullptr, _IONBF, 0);
+    std::setvbuf(stderr, nullptr, _IONBF, 0);
+    Require(SUCCEEDED(WerSetFlags(WER_FAULT_REPORTING_NO_UI)),
+            "could not disable interactive crash reporting for the test process");
     ComScope com;
     Require(SUCCEEDED(com.result), "test COM initialization failed");
+    if (argc == 2 && std::string_view(argv[1]) == "--xaml") {
+        try { CheckXamlRuntime(); }
+        catch (const winrt::hresult_error& error) {
+            std::fprintf(stderr, "FAIL: XAML exception %08X: %ls\n", static_cast<unsigned>(error.code().value), error.message().c_str());
+            return 2;
+        }
+        return 0;
+    }
+    if (argc == 2 && std::string_view(argv[1]) == "--preview") {
+        PreviewXamlRuntime();
+        return 0;
+    }
     CheckBookmarkBoundaries();
     CheckEncodingStorageAndLayout();
     CheckInsertionMatrix();
@@ -807,5 +930,28 @@ int main() {
     CheckCallbacksAndDeferredWork();
     CheckNativeFoldersAndRecentScan();
     CheckPoliciesAndWindowsView();
+    CheckWorkerFailuresAndStop();
+    CheckIconPixelsAndCaches();
+    CheckShellSelectionAndNavigation();
+    CheckShellConnections();
+    CheckBackupDialogContracts();
+    CheckDriveAndDeferredNativePaths();
+    CheckNativeThreadRouting();
+    CheckStorageAbandonmentAndFailure();
+    CheckHookCoordinators();
+    CheckPlatformFailures();
+    CheckBackupAllocationRecovery();
+    CheckIconAllocationCleanup();
+    CheckBookmarkStorageEdges();
+    CheckBackupSchemaAndSizeEdges();
+    CheckRecentStorageAndViewEdges();
+    CheckSettingsSnapshotEdges();
+    CheckWorkerWakeAndActiveGenerationEdges();
+    CheckShellDiscoveryAndSelectionGaps();
+    CheckNavigationEventAndTrackerGaps();
+    CheckDeferredWorkAndSettingsGaps();
+    CheckActualWindowsRecentWorkerGaps();
+    CheckNativeFrameAndInitializationGaps();
+    CheckUninitPendingOperationAndDropGaps();
     return 0;
 }
