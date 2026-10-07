@@ -5,7 +5,7 @@ and variant with your results. This is a checklist of expected behavior, not a
 record of completed tests.
 
 Before starting, save a backup of your current bookmarks using **right-click + →
-Save bookmarks**. Use disposable folders under a unique `%TEMP%` subfolder:
+Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 `A`, `B`, `C`, a folder with spaces and non-Latin characters, and a folder with a
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
@@ -75,8 +75,8 @@ results, screenshots, backups and generated output outside the repository.
 
 9. **Save and restore a backup**
    - **Steps:** Save the test list, including its Unicode folder, through
-     **right-click + → Save bookmarks**. Change the list, then load that file
-     through **Load bookmarks**. Open a new Explorer window.
+     **right-click + → Save bookmarks…**. Change the list, then load that file
+     through **Load bookmarks…**. Open a new Explorer window.
    - **Expected:** The restored list replaces the changed list and preserves
      paths, Unicode characters and order. The restored bookmarks persist.
 

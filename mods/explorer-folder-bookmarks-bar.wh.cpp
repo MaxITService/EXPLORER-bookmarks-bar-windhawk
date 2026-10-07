@@ -1,8 +1,8 @@
 // ==WindhawkMod==
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
-// @description     Adds an adaptive folder bookmarks bar to newly opened Windows 11 File Explorer windows.
-// @version         0.8.11
+// @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
+// @version         0.8.15
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -15,76 +15,76 @@
 /*
 # Explorer Folder Bookmarks Bar
 
-For the Windows 11 WinUI File Explorer. A scrollable bookmark bar appears below
-the address bar. Click **+** or press **Ctrl+B** to bookmark the current filesystem
-folder; Ctrl+B removes the bookmark when the folder already has one. With
-folders selected in the file list, Ctrl+B bookmarks all of them, or removes
-them when all are bookmarked already. You can also drag one or more folders
-from File Explorer onto the bar; they are inserted where you drop them. For
-safety, one Ctrl+B or drop handles at most 20 folders; the rest are ignored.
-When bookmarks cannot be added because the list is full (32 folders), or the
-folder is already bookmarked, a short notice appears below the bar.
-Click a bookmark to navigate the active tab to it. Ctrl+click asks Explorer to
-open it in a new tab; right-click opens it in a new window. Drag a bookmark
-onto another to reorder the row. Middle-click a bookmark to remove it from the
-bar. Removing a bookmark never deletes its target folder.
+[Project on GitHub](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk)
+
+A row of folder bookmarks under the address bar of Windows 11 File Explorer.
 
 ![Explorer Folder Bookmarks Bar in File Explorer](https://raw.githubusercontent.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/main/Promo/How-it-works.gif)
 
-After enabling or updating the mod, open a new File Explorer window to use the
-bar. Windows that were already open may remain unchanged. Opening a new window
-is the supported way to activate the bar without relying on live window updates.
+After enabling or updating the mod, open a new File Explorer window. Windows
+that were already open may not get the bar. Once a window has the bar, it
+follows changes made in other windows and in settings.
 
-The bar expands from one to four rows as the window narrows. If bookmarks
-still exceed the fourth row, the bar can pan sideways.
-Left-click **FX**, next to **+**, for the profile (**~**), Desktop, Documents,
-Downloads, and the custom folders listed in this mod's Windhawk settings.
-Custom shortcuts are empty by default. Add a folder path and optional label in
-**Settings → FX custom folders**; blank entries are ignored. Paths must be
-absolute, and `%NAME%` environment variables are expanded. Local, network
-(UNC or mapped drive) and removable-drive folders all work. A folder missing
-from a local disk is hidden from FX until it exists again. Like bookmarks,
-network and removable entries are shown without being checked; if one is
-unavailable, Explorer reports it when you click it. Saved settings also update
-panels in already-open Explorer windows. Right-click **FX** for all drives with their
-labels. The list updates each time the menu opens. Ctrl+click a menu entry to
-open it in a new tab.
+## Bookmarks
 
-Right-click **+** for **Save bookmarks** and **Load bookmarks**. The commands
-open a file dialog so you can choose the JSON backup. The profile folder is
-suggested initially. Loading replaces the current list only after the entire
-UTF-8 JSON file passes validation.
+- **+** bookmarks the current folder. **Ctrl+B** does the same, or removes the
+  bookmark if there is one.
+- With folders selected in the file list, Ctrl+B bookmarks them all, or
+  removes them if all are already bookmarked.
+- Drag folders onto the bar to insert them where you drop them.
+- Up to 32 bookmarks. One Ctrl+B or drop takes at most 20 folders. A short
+  notice appears when the bar is full or a folder is already there.
+- Click to open in the current tab, Ctrl+click for a new tab, right-click for
+  a new window.
+- Drag a bookmark to reorder. Middle-click removes it; the folder itself is
+  not touched.
+- Hover shows the full path. A missing folder on a local disk gets a yellow
+  warning icon. Custom folder icons (desktop.ini) are shown.
+- Virtual locations such as Home can't be bookmarked.
 
-Turn on **Recent folders → Show recent folders** in settings to show up to
-three recently opened folders at the right end of the bar, after a **|**
-separator. The newest folder
-is nearest the right edge, where **RC** sits. Left-click **RC** for the
-remembered folders that have no button, up to ten in total, and to choose
-the source: folders you open in File Explorer, or Windows recent items, which
-are read in the background only from the Recent folder when it is on a local
-fixed drive. While a scan runs, the bar keeps the last ready list. If
-Windows is set not to keep recent items, RC says so. Right-click **RC** to
-clear the list; clearing Windows recent items only hides them from the bar and
-never deletes Windows data. Middle-click a recent folder to remove it, or
-drag it onto the bookmarks to keep it. Bookmarked folders and folders missing
-from a local disk are never listed as recent. When the window is too narrow, the
-recent buttons fold into RC; without RC, the oldest buttons are hidden first.
-Folders you open in File Explorer are remembered in this mod's Windhawk local
-storage (up to 64 paths) and stay there after recent folders are turned off. To
-erase them, choose *Folders opened in File Explorer* in the RC menu and clear
-the list with a right-click on RC.
+The bar grows from one to four rows as the window narrows, then scrolls
+sideways.
 
-The bookmark list lives in this mod's Windhawk local storage. This version
-supports up to 32 folders and uses the folder name as the button label. Icons
-come from Windows Shell, including desktop.ini custom folder icons. Hovering a
-bookmark shows its full path. Virtual locations such as Home are ignored by
-**+**. Bookmark removal never touches the target folder or its contents.
-Missing folders on local fixed drives show a yellow warning icon. Icons are
-cached for up to five minutes and refreshed on hover without recreating buttons.
-Changes to bookmarks and recent folders update the other open panels too.
+## FX menu
 
-The XAML insertion point can change in a Windows update. If the bar is not
-visible, disable the mod and check the Windhawk log before trying it again.
+Left-click **FX**, next to **+**, for your profile (**~**), Desktop, Documents,
+Downloads and your own folders. Right-click it for all drives. Ctrl+click an
+entry to open it in a new tab.
+
+Add your folders in **Settings → FX custom folders**: an absolute path
+(`%NAME%` variables work) and an optional label. Local, network and removable
+folders all work. A missing local folder is hidden until it's back; network
+and removable folders are always listed.
+
+## Backup
+
+Right-click **+** for **Save bookmarks…** and **Load bookmarks…** (JSON file).
+Loading replaces the current list; a file that fails validation changes
+nothing.
+
+## Recent folders
+
+Off by default. Turn on **Recent folders → Show recent folders** to show up to
+three recent folders at the right end of the bar, newest on the right.
+
+- Left-click **RC** for the rest of the list (up to 10 in total) and to pick
+  the source: folders opened in File Explorer, or Windows recent items (read
+  only when the Recent folder is on a local fixed drive).
+- Right-click **RC** to clear the list. For Windows recent items this only
+  hides them from the bar.
+- Middle-click a recent folder to remove it; drag it onto the bookmarks to
+  keep it.
+- Bookmarked and missing folders are skipped. In a narrow window the buttons
+  move into RC.
+
+The mod keeps up to 64 folders opened in File Explorer in its local storage,
+even while the feature is off. To erase them, turn the feature on, pick
+*Folders opened in File Explorer* in the RC menu, and right-click RC.
+
+## If the bar doesn't appear
+
+A Windows update can move the spot where the bar is inserted. Disable the mod
+and check the Windhawk log.
 */
 // ==/WindhawkModReadme==
 
@@ -93,38 +93,38 @@ visible, disable the mod and check the Windhawk log before trying it again.
 - fxCustomFolders:
     - - label: ''
         $name: Menu label
-        $description: Name shown for this folder in the FX menu. If blank, the folder's own name is used.
+        $description: Optional. Default is the folder name.
       - path: ''
         $name: Folder path
-        $description: Full path of the folder, for example C:\Projects, \\server\share\Docs or %USERPROFILE%\Pictures. Leave blank to skip this entry. A folder missing from a local disk is hidden until it exists again.
+        $description: For example C:\Projects, \\server\share or %USERPROFILE%\Pictures.
   $name: FX custom folders
-  $description: Adds your own folders to the menu of the FX button (the second button on the bookmarks bar, right after +). Left-click FX to open the menu. It always lists your profile (~), Desktop, Documents and Downloads, followed by the folders from this list in the same order (up to 24). Click an entry to open it in the current tab; Ctrl+click opens it in a new tab. Right-click FX for a list of all drives. Changes apply to open panels after you save. Local, network and removable-drive folders all work. A folder missing from a local disk is hidden until it exists again; network and removable entries are always shown, and Explorer reports it if one is unavailable when you click it.
+  $description: Extra folders for the FX menu (the button after +), up to 24.
 - bookmarkHotkey: true
-  $name: Ctrl+B bookmarks the current or selected folders
-  $description: Press Ctrl+B in File Explorer to bookmark the current folder, or to remove its bookmark when it already has one. With folders selected in the file list, Ctrl+B bookmarks all of them, or removes them when all are bookmarked already; at most 20 folders are handled at a time. Ctrl+B is ignored while you type in the address bar, the search box or a rename field.
+  $name: Ctrl+B shortcut
+  $description: Adds or removes bookmarks for the current or selected folders.
 - recent:
   - enabled: false
     $name: Show recent folders
-    $description: Turns recent folders and RC on. The other settings in this group apply only while this is on. While it is off, opened folders are not recorded; folders already remembered stay in the mod's local storage (up to 64) until you clear the list with RC.
+    $description: The settings below work only while this is on.
   - buttons: 3
     $name: Buttons
-    $description: How many recent folders appear as buttons, from 1 to 3. When the window is too narrow, the buttons fold into RC; with RC hidden, the oldest buttons are hidden first.
+    $description: How many recent folders get a button, 1 to 3.
     #! $min: 1
     #! $max: 3
   - history: 10
     $name: Remembered folders
-    $description: How many recent folders the buttons and the RC menu list together, from 1 to 10. It is never less than the number of buttons.
+    $description: Total in the buttons and the RC menu, 1 to 10.
     #! $min: 1
     #! $max: 10
   - rcButton: menu
     $name: RC button
-    $description: RC sits at the right edge. Left-click it for remembered folders that have no button and to choose the source, folders opened in File Explorer or Windows recent items, which are read only from the Recent folder on a local fixed drive. Right-click it to clear the list. A hidden RC still appears while no recent folder is available, so the source can be changed.
+    $description: Menu with the other recent folders and the source.
     $options:
-    - menu: Shown, right-click offers Clear
-    - clear: Shown, right-click clears at once
+    - menu: Shown; right-click opens Clear
+    - clear: Shown; right-click clears at once
     - hidden: Hidden
   $name: Recent folders
-  $description: Recently opened folders at the right end of the bar, after a | separator, with the newest nearest the right edge. Click one to open it; Ctrl+click opens a new tab and right-click a new window. Middle-click removes it from the recent list; drag it onto the bookmarks to keep it. Bookmarked folders are never listed.
+  $description: Recent folders at the right end of the bar.
 */
 // ==/WindhawkModSettings==
 
@@ -2760,10 +2760,9 @@ std::wstring FolderTooltip(const std::wstring& path, FolderStatus status,
     if (status == FolderStatus::Missing) {
         tooltip += L"\nFolder not found";
     }
-    tooltip += L"\nCtrl+click for new tab; right-click for new window";
-    tooltip += recent ? L"\nDrag onto the bookmarks to keep"
-                        L"\nMiddle-click to remove from recent folders"
-                      : L"\nDrag to reorder; middle-click to remove bookmark";
+    tooltip += L"\nCtrl+click: new tab; right-click: new window";
+    tooltip += recent ? L"\nDrag onto bookmarks to keep; middle-click: remove"
+                      : L"\nDrag: reorder; middle-click: remove";
     return tooltip;
 }
 
@@ -3044,10 +3043,10 @@ void FillRecentMenu(BarState& state, const muxc::MenuFlyout& menu,
     menu.Items().Clear();
     if (state.windowsRecentsOff) {
         AppendDisabledMenuItem(
-            menu, L"Windows is not keeping recent items",
-            L"Recent files are turned off in Settings > Personalization > "
-            L"Start, or by a policy. Choose File Explorer history below, or "
-            L"turn recent files on in Windows.");
+            menu, L"Windows recent items are off",
+            L"Turned off in Settings > Personalization > Start, or by "
+            L"policy. Pick \"Folders opened in File Explorer\" below, or "
+            L"turn them on in Windows.");
     } else if (state.visibleRecents >= state.recentFolders.size()) {
         AppendDisabledMenuItem(menu, state.recentFolders.empty()
                                          ? L"No recent folders"
@@ -3128,10 +3127,10 @@ void AppendRecents(BarState& state, const muxc::StackPanel& recents,
     muxc::ToolTipService::SetToolTip(
         rcButton,
         winrt::box_value(g_recentSettings.rightClickClears
-                             ? L"RC: more recent folders and their source; "
-                               L"right-click clears the list"
-                             : L"RC: more recent folders and their source; "
-                               L"right-click to clear the list"));
+                             ? L"More recent folders, source choice; "
+                               L"right-click clears immediately"
+                             : L"More recent folders, source choice; "
+                               L"right-click to clear"));
     auto weakRc = winrt::make_weak(rcButton);
     muxc::MenuFlyout recentMenu;
     TrackOpening(state.recentHandlers, recentMenu, [weakPanel, weakRc](
@@ -3294,9 +3293,7 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
     std::wstring backupPath = SuggestedBackupPath();
     muxc::MenuFlyout backupMenu;
     muxc::MenuFlyoutItem saveItem;
-    saveItem.Text(L"Save bookmarks");
-    muxc::ToolTipService::SetToolTip(
-        saveItem, winrt::box_value(L"Choose a JSON backup file"));
+    saveItem.Text(L"Save bookmarks\u2026");
     TrackClick(state->panelHandlers, saveItem, [backupPath, weakPanel](
                        const winrt::Windows::Foundation::IInspectable& sender,
                        const mux::RoutedEventArgs&) {
@@ -3325,9 +3322,7 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
     });
     backupMenu.Items().Append(saveItem);
     muxc::MenuFlyoutItem loadItem;
-    loadItem.Text(L"Load bookmarks");
-    muxc::ToolTipService::SetToolTip(
-        loadItem, winrt::box_value(L"Choose a JSON backup to load"));
+    loadItem.Text(L"Load bookmarks\u2026");
     TrackClick(state->panelHandlers, loadItem, [backupPath, weakPanel](
                        const winrt::Windows::Foundation::IInspectable& sender,
                        const mux::RoutedEventArgs&) {
@@ -3388,7 +3383,7 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
                                    kButtonVerticalInset});
     muxc::ToolTipService::SetToolTip(
         fxButton, winrt::box_value(
-            L"FX: left-click for folders; right-click for drives"));
+            L"Folders; right-click for drives"));
     auto weakFxButton = winrt::make_weak(fxButton);
     muxc::MenuFlyout foldersMenu;
     muxc::MenuFlyout drivesMenu;
@@ -3450,10 +3445,10 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
             appendLocation(menu, folder.label, folder.path);
         }
         if (menu.Items().Size() == 0) {
-            AppendDisabledMenuItem(menu, L"No available folders");
+            AppendDisabledMenuItem(menu, L"No folders available");
         }
     });
-    AppendDisabledMenuItem(foldersMenu, L"No available folders");
+    AppendDisabledMenuItem(foldersMenu, L"No folders available");
     // Build the list when FX opens so newly attached drives appear immediately.
     // Only local fixed drives are probed; other drives are listed unchecked.
     TrackOpening(state->panelHandlers, drivesMenu, [appendLocation, state](
@@ -3480,10 +3475,10 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
             appendLocation(menu, DriveMenuLabel(drive), drive, true);
         }
         if (menu.Items().Size() == 0) {
-            AppendDisabledMenuItem(menu, L"No available drives");
+            AppendDisabledMenuItem(menu, L"No drives available");
         }
     });
-    AppendDisabledMenuItem(drivesMenu, L"No available drives");
+    AppendDisabledMenuItem(drivesMenu, L"No drives available");
     fxButton.Flyout(foldersMenu);
     fxButton.ContextFlyout(drivesMenu);
     firstRow.Children().Append(fxButton);

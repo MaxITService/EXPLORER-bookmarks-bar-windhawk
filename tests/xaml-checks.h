@@ -155,7 +155,7 @@ void CheckXamlPanelRefresh() {
             "all-visible recent menu missing disabled placeholder");
     state.windowsRecentsOff = true;
     FillRecentMenu(state, menu, winrt::make_weak(anchor));
-    Require(menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"Windows is not keeping recent items",
+    Require(menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"Windows recent items are off",
             "disabled Windows recent explanation omitted");
     fixture::integers[L"recent.enabled"] = 0;
     LoadSettings();

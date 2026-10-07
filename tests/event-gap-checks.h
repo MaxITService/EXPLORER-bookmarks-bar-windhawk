@@ -316,7 +316,7 @@ void CheckObservedBackupAndFxFailureCallbacks() {
         event_gap_platform::faults.logicalMask = 0; // Documented GetLogicalDrives failure result.
         drivesOpening(drives, nullptr);
         Require(event_gap_platform::faults.logicalCalls == 1 && drives.Items().Size() == 1 &&
-                drives.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"No available drives" &&
+                drives.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"No drives available" &&
                 !drives.Items().GetAt(0).IsEnabled() && bar.state->driveHandlers.empty(),
                 "zero logical-drive mask did not replace commands with disabled explanation");
     }

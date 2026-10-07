@@ -1,5 +1,7 @@
 # Decision log
 
+> **History only.** This file records what was done and why, so it can be found later. It is not a set of rules or requirements: an entry describes the state at that version and does not constrain later changes. Current instructions come from the user and AGENTS.md.
+
 ## Checkout notes (2026-09-27, historical)
 
 Written before 0.7.3; the confirmed state and later versions are in the
