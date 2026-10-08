@@ -37,22 +37,14 @@ struct Faults {
     bool volume = false;
     bool volumeResult = false;
     std::wstring volumeName;
-    bool event = false;
-    bool thread = false;
     bool coInitialize = false;
-    bool wait = false;
     ShellIcon shellIcon = ShellIcon::Normal;
-    bool enumerate = false;
-    std::vector<WIN32_FIND_DATAW> entries;
-    size_t enumerationIndex = 0;
     unsigned tempCalls = 0;
     unsigned writeCalls = 0;
     unsigned flushCalls = 0;
     unsigned moveCalls = 0;
     unsigned deleteCalls = 0;
     unsigned destroyedIcons = 0;
-    unsigned findNextCalls = 0;
-    unsigned findCloseCalls = 0;
     std::wstring temporary;
 };
 inline Faults faults;
@@ -61,7 +53,6 @@ struct Scope {
     Scope() { faults = {}; }
     ~Scope() { faults = std::move(old); }
 };
-inline HANDLE FindHandle() { return reinterpret_cast<HANDLE>(static_cast<uintptr_t>(0x7171)); }
 }
 
 inline UINT WINAPI PlatformGetTempFileNameW(LPCWSTR directory, LPCWSTR prefix, UINT unique, LPWSTR name) {
@@ -132,7 +123,7 @@ inline DWORD WINAPI PlatformExpandEnvironmentStringsW(LPCWSTR input, LPWSTR outp
     if (output && f.environmentChangedSize) return count + 1;
     return ExpandEnvironmentStringsW(input, output, count);
 }
-// Preserve the existing Recent-folder redirection rather than bypassing it.
+// Chain to any earlier known-folder fixture rather than bypassing it.
 inline auto PlatformPriorKnownFolderPath = &SHGetKnownFolderPath;
 #undef SHGetKnownFolderPath
 inline HRESULT WINAPI PlatformSHGetKnownFolderPath(REFKNOWNFOLDERID id, DWORD flags, HANDLE token, PWSTR* result) {
@@ -155,22 +146,9 @@ inline BOOL WINAPI PlatformGetVolumeInformationW(LPCWSTR root, LPWSTR name, DWOR
     if (capacity) { const size_t length = std::min<size_t>(f.volumeName.size(), capacity - 1); std::copy_n(f.volumeName.begin(), length, name); name[length] = 0; }
     return TRUE;
 }
-inline HANDLE WINAPI PlatformCreateEventW(LPSECURITY_ATTRIBUTES security, BOOL manualReset, BOOL initial, LPCWSTR name) {
-    if (platform_failure::faults.event) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return nullptr; }
-    return CreateEventW(security, manualReset, initial, name);
-}
-inline HANDLE WINAPI PlatformCreateThread(LPSECURITY_ATTRIBUTES security, SIZE_T stack, LPTHREAD_START_ROUTINE proc,
-        LPVOID argument, DWORD flags, LPDWORD id) {
-    if (platform_failure::faults.thread) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return nullptr; }
-    return CreateThread(security, stack, proc, argument, flags, id);
-}
 inline HRESULT WINAPI PlatformCoInitializeEx(LPVOID reserved, DWORD apartment) {
     if (platform_failure::faults.coInitialize) return RPC_E_CHANGED_MODE;
     return CoInitializeEx(reserved, apartment);
-}
-inline DWORD WINAPI PlatformMsgWaitForMultipleObjectsEx(DWORD count, const HANDLE* handles, DWORD timeout, DWORD wakeMask, DWORD flags) {
-    if (platform_failure::faults.wait) { SetLastError(ERROR_INVALID_HANDLE); return WAIT_FAILED; }
-    return MsgWaitForMultipleObjectsEx(count, handles, timeout, wakeMask, flags);
 }
 inline DWORD_PTR WINAPI PlatformSHGetFileInfoW(LPCWSTR path, DWORD attributes, SHFILEINFOW* info, UINT size, UINT flags) {
     switch (platform_failure::faults.shellIcon) {
@@ -183,28 +161,6 @@ inline DWORD_PTR WINAPI PlatformSHGetFileInfoW(LPCWSTR path, DWORD attributes, S
 inline BOOL WINAPI PlatformDestroyIcon(HICON icon) {
     ++platform_failure::faults.destroyedIcons;
     return DestroyIcon(icon);
-}
-inline HANDLE WINAPI PlatformFindFirstFileExW(LPCWSTR name, FINDEX_INFO_LEVELS level, LPVOID data,
-        FINDEX_SEARCH_OPS operation, LPVOID filter, DWORD flags) {
-    auto& f = platform_failure::faults;
-    if (!f.enumerate) return FindFirstFileExW(name, level, data, operation, filter, flags);
-    f.enumerationIndex = 0;
-    if (f.entries.empty()) { SetLastError(ERROR_FILE_NOT_FOUND); return INVALID_HANDLE_VALUE; }
-    *static_cast<WIN32_FIND_DATAW*>(data) = f.entries.front();
-    return platform_failure::FindHandle();
-}
-inline BOOL WINAPI PlatformFindNextFileW(HANDLE handle, LPWIN32_FIND_DATAW data) {
-    if (handle != platform_failure::FindHandle()) return FindNextFileW(handle, data);
-    auto& f = platform_failure::faults;
-    ++f.findNextCalls;
-    if (++f.enumerationIndex >= f.entries.size()) { SetLastError(ERROR_NO_MORE_FILES); return FALSE; }
-    *data = f.entries[f.enumerationIndex];
-    return TRUE;
-}
-inline BOOL WINAPI PlatformFindClose(HANDLE handle) {
-    if (handle != platform_failure::FindHandle()) return FindClose(handle);
-    ++platform_failure::faults.findCloseCalls;
-    return TRUE;
 }
 
 #define GetTempFileNameW PlatformGetTempFileNameW
@@ -220,12 +176,6 @@ inline BOOL WINAPI PlatformFindClose(HANDLE handle) {
 #define ExpandEnvironmentStringsW PlatformExpandEnvironmentStringsW
 #define SHGetKnownFolderPath PlatformSHGetKnownFolderPath
 #define GetVolumeInformationW PlatformGetVolumeInformationW
-#define CreateEventW PlatformCreateEventW
-#define CreateThread PlatformCreateThread
 #define CoInitializeEx PlatformCoInitializeEx
-#define MsgWaitForMultipleObjectsEx PlatformMsgWaitForMultipleObjectsEx
 #define SHGetFileInfoW PlatformSHGetFileInfoW
 #define DestroyIcon PlatformDestroyIcon
-#define FindFirstFileExW PlatformFindFirstFileExW
-#define FindNextFileW PlatformFindNextFileW
-#define FindClose PlatformFindClose

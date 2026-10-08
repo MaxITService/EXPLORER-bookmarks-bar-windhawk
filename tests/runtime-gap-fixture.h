@@ -1,7 +1,6 @@
 #pragma once
 // Opt-in native faults. Include after platform-failure-fixture.h, before the
 // unchanged mod source. Default calls preserve the previously installed API.
-#include <atomic>
 
 namespace runtime_gap {
 struct Faults {
@@ -14,11 +13,6 @@ struct Faults {
     bool timer = false;
     HWND visibleTab = nullptr;
     bool overrideVisibility = false;
-    HANDLE scanEntered = nullptr;
-    HANDLE scanRelease = nullptr;
-    std::atomic<unsigned>* scanCalls = nullptr;
-    LPTHREAD_START_ROUTINE workerWrapper = nullptr;
-    LPTHREAD_START_ROUTINE workerOriginal = nullptr;
     unsigned libraryCalls = 0;
 };
 inline Faults faults;
@@ -84,30 +78,6 @@ inline BOOL WINAPI RuntimeIsWindowVisible(HWND window) {
     if (f.overrideVisibility) return window == f.visibleTab;
     return IsWindowVisible(window);
 }
-inline auto RuntimePriorKnownFolderPath = &SHGetKnownFolderPath;
-#undef SHGetKnownFolderPath
-inline HRESULT WINAPI RuntimeSHGetKnownFolderPath(REFKNOWNFOLDERID id,
-        DWORD flags, HANDLE token, PWSTR* result) {
-    const auto& f = runtime_gap::faults;
-    if (id == FOLDERID_Recent && f.scanEntered) {
-        if (f.scanCalls) ++*f.scanCalls;
-        SetEvent(f.scanEntered);
-        if (WaitForSingleObject(f.scanRelease, 5000) != WAIT_OBJECT_0) return E_ABORT;
-    }
-    return RuntimePriorKnownFolderPath(id, flags, token, result);
-}
-inline auto RuntimePriorCreateThread = &CreateThread;
-#undef CreateThread
-inline HANDLE WINAPI RuntimeCreateThread(LPSECURITY_ATTRIBUTES attributes,
-        SIZE_T stack, LPTHREAD_START_ROUTINE procedure, LPVOID parameter,
-        DWORD flags, LPDWORD id) {
-    auto& f = runtime_gap::faults;
-    if (f.workerWrapper) {
-        f.workerOriginal = procedure;
-        procedure = f.workerWrapper;
-    }
-    return RuntimePriorCreateThread(attributes, stack, procedure, parameter, flags, id);
-}
 
 #define SetWindowSubclassFromAnyThread RuntimeSetWindowSubclassFromAnyThread
 #define SetPropW RuntimeSetPropW
@@ -117,5 +87,3 @@ inline HANDLE WINAPI RuntimeCreateThread(LPSECURITY_ATTRIBUTES attributes,
 #define LoadLibraryExW RuntimeLoadLibraryExW
 #define SetTimer RuntimeSetTimer
 #define IsWindowVisible RuntimeIsWindowVisible
-#define SHGetKnownFolderPath RuntimeSHGetKnownFolderPath
-#define CreateThread RuntimeCreateThread

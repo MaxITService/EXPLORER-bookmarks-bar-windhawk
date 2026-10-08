@@ -1,4 +1,4 @@
-// Standalone checks of the real coordinator and native frame lifetime code.
+// Standalone checks of the real storage, settings and native frame lifetime code.
 // WH_EDITING stubs Windhawk; this executable never installs hooks in Explorer.
 #include "allocation-fixture.h"
 #include "windhawk-fixture.h"
@@ -18,90 +18,6 @@ void Require(bool condition, const char* message) {
         std::fprintf(stderr, "FAIL: %s\n", message);
         std::exit(1);
     }
-}
-
-HANDLE scanEntered = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-HANDLE releaseScan = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-std::atomic<unsigned> scanCount = 0;
-
-DWORD WINAPI TestWorker(void*) {
-    return RunWindowsRecentWorker([] {
-        const unsigned number = ++scanCount;
-        SetEvent(scanEntered);
-        Require(WaitForSingleObject(releaseScan, 5000) == WAIT_OBJECT_0,
-                "scan gate timed out");
-        return std::vector<TimedFolder>{{number == 1 ? L"C:\\old" : L"C:\\new", 1}};
-    });
-}
-
-void WaitForScanEnd() {
-    const ULONGLONG deadline = GetTickCount64() + 5000;
-    for (;;) {
-        {
-            std::lock_guard lock(g_windowsRecentsMutex);
-            if (!g_windowsRecentsScanning) {
-                return;
-            }
-        }
-        Require(GetTickCount64() < deadline, "worker did not finish");
-        Sleep(1);
-    }
-}
-
-void CheckWorker() {
-    g_windowsRecentsActive = true;
-    g_windowsRecentsGeneration = 1;
-    g_windowsRecents = {{L"C:\\last-ready", 1}};
-    g_windowsRecentWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    g_windowsRecentThread = CreateThread(nullptr, 0, TestWorker, nullptr, 0, nullptr);
-    Require(g_windowsRecentWake && g_windowsRecentThread, "worker creation failed");
-    const auto before = CachedWindowsRecentFolders();
-    Require(before.size() == 1 && before.front().path == L"C:\\last-ready",
-            "ready snapshot was lost while requesting a refresh");
-    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0, "scan did not start");
-
-    // The scanner remains blocked. Readers must still return the ready snapshot.
-    HANDLE readReturned = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    std::thread reader([&] {
-        for (unsigned i = 0; i < 100; ++i) {
-            const auto snapshot = CachedWindowsRecentFolders();
-            Require(snapshot.size() == 1, "concurrent cache reader lost snapshot");
-        }
-        SetEvent(readReturned);
-    });
-    Require(WaitForSingleObject(readReturned, 2000) == WAIT_OBJECT_0,
-            "cache reader waited for scanner I/O");
-    reader.join();
-    CloseHandle(readReturned);
-
-    // Actual settings transition disables the source before the scan completes.
-    UpdateWindowsRecentMode(true);
-    SetEvent(releaseScan);
-    WaitForScanEnd();
-    Require(CachedWindowsRecentFolders().empty(), "obsolete scan was published");
-
-    {
-        std::lock_guard lock(g_windowsRecentsMutex);
-        g_windowsRecentsActive = true;
-        ++g_windowsRecentsGeneration;
-    }
-    CachedWindowsRecentFolders();
-    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0,
-            "new source generation was not scanned");
-    for (unsigned i = 0; i < 100; ++i) {
-        CachedWindowsRecentFolders();
-    }
-    SetEvent(releaseScan);
-    WaitForScanEnd();
-    const auto after = CachedWindowsRecentFolders();
-    Require(after.size() == 1 && after.front().path == L"C:\\new",
-            "new generation did not publish its snapshot");
-    Require(scanCount == 2, "duplicate requests created additional scans");
-    StopWindowsRecentWorker();
-    Require(!g_windowsRecentThread && !g_windowsRecentWake, "worker handles leaked");
-    CloseHandle(scanEntered);
-    CloseHandle(releaseScan);
-    std::puts("PASS: nonblocking snapshots, stale generation, request coalescing, worker join");
 }
 
 HWND CreateTestFrame() {
@@ -479,28 +395,15 @@ void CheckSettingsAndRecents() {
     recent = SplitPaths(fixture::storage[kRecentsKey], kMaxStoredRecents);
     g_recentSettings.history = 2;
     const auto view = LoadRecentView({recent.front()});
-    Require(view.source == RecentSource::Explorer && view.folders.size() == 2 &&
+    Require(view.folders.size() == 2 &&
             view.folders[0] == recent[1], "recent view did not filter bookmarks or apply history limit");
-    RemoveRecent(RecentSource::Explorer, recent.front());
+    RemoveRecent(recent.front());
     Require(SplitPaths(fixture::storage[kRecentsKey], kMaxStoredRecents).size() == kMaxStoredRecents - 1,
             "recent removal failed");
-    ClearRecents(RecentSource::Explorer);
+    ClearRecents();
     Require(fixture::storage[kRecentsKey].empty(), "explorer history not cleared");
-    fixture::storage[kWindowsRecentHiddenKey] = L"broken\n0000000000000010\t\\\\test.invalid\\share\\\n10\t";
-    auto hidden = ReadHiddenWindowsRecentsLocked();
-    Require(hidden.size() == 1 && hidden.front().hiddenAt == 16 &&
-            hidden.front().path == L"\\\\test.invalid\\share", "hidden history parser failed");
-    RemoveRecent(RecentSource::Windows, L"\\\\test.invalid\\share");
-    Require(ReadHiddenWindowsRecentsLocked().size() == 1, "hidden recent duplicate retained");
-    ClearRecents(RecentSource::Windows);
-    Require(ReadHiddenWindowsRecentsLocked().empty() &&
-            ParseFileTime(fixture::storage[kWindowsRecentClearedKey]) > 0,
-            "windows history clear did not store timestamp/reset hidden list");
-    Require(ParseFileTime(L"") == 0 && ParseFileTime(FormatFileTime(~0ULL)) == ~0ULL &&
-            FileTimeValue(FILETIME{0xFFFFFFFF, 1}) == 0x1FFFFFFFFULL,
-            "FILETIME conversion failed");
     fixture::Reset();
-    std::puts("PASS: settings clamps/RC modes, FX validation, recent history and hidden timestamps");
+    std::puts("PASS: settings clamps/RC modes, FX validation and recent history");
 }
 
 struct BackupFixture {
@@ -698,164 +601,20 @@ void CheckCallbacksAndDeferredWork() {
     std::puts("PASS: exception guards, reverse revocation, operation scopes, deferred timers and Shell sink contracts");
 }
 
-void CheckNativeFoldersAndRecentScan() {
+void CheckNativeFolderStatus() {
     fixture::Reset();
     BackupFixture scratch;
-    fixture::recentDirectory = scratch.directory;
-    g_windowsRecentStopping = false;
-    Require(ScanWindowsRecentFolders().empty(), "empty Recent directory produced folders");
-    fixture::recentDirectory = scratch.directory + L"\\absent";
-    Require(ScanWindowsRecentFolders().empty(), "missing Recent directory was scanned");
-    fixture::recentDirectory = scratch.directory;
     const auto first = scratch.directory + L"\\first";
-    const auto second = scratch.directory + L"\\second";
-    Require(CreateDirectoryW(first.c_str(), nullptr) && CreateDirectoryW(second.c_str(), nullptr),
-            "scan target directory creation failed");
+    Require(CreateDirectoryW(first.c_str(), nullptr), "status target directory creation failed");
     scratch.Write("test file");
     Require(CheckFolderStatus(first) == FolderStatus::Available &&
             CheckFolderStatus(scratch.file) == FolderStatus::Missing &&
             CheckFolderStatus(first + L"\\absent") == FolderStatus::Missing &&
             CheckFolderStatus(L"relative") == FolderStatus::Unknown,
             "native directory/file/missing status classification failed");
-    std::vector<std::wstring> links;
-    auto link = [&](const std::wstring& target, ULONGLONG timestamp) {
-        const auto name = scratch.directory + L"\\link" + std::to_wstring(links.size()) + L".lnk";
-        winrt::com_ptr<IShellLinkW> shortcut;
-        winrt::check_hresult(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
-                                             IID_PPV_ARGS(shortcut.put())));
-        winrt::check_hresult(shortcut->SetPath(target.c_str()));
-        winrt::check_hresult(shortcut.as<IPersistFile>()->Save(name.c_str(), TRUE));
-        ScopedFile file(CreateFileW(name.c_str(), FILE_WRITE_ATTRIBUTES, 0, nullptr,
-                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        FILETIME time{static_cast<DWORD>(timestamp), static_cast<DWORD>(timestamp >> 32)};
-        Require(file.value != INVALID_HANDLE_VALUE && SetFileTime(file.value, nullptr, nullptr, &time),
-                "shortcut timestamp setup failed");
-        links.push_back(name);
-    };
-    const auto base = CurrentFileTime();
-    link(first, base);
-    link(second, base + 1);
-    link(first, base + 2);
-    link(scratch.file, base + 3);
-    const auto folders = ScanWindowsRecentFolders();
-    Require(folders.size() == 2 && folders[0].path == first && folders[0].usedAt == base + 2 &&
-            folders[1].path == second, "shortcut scan failed sorting, deduplication or file exclusion");
-    g_windowsRecentStopping = true;
-    Require(ScanWindowsRecentFolders().empty(), "stopping scan produced folders");
-    g_windowsRecentStopping = false;
-    for (auto& name : links) Require(DeleteFileW(name.c_str()), "shortcut cleanup failed");
-    Require(RemoveDirectoryW(first.c_str()) && RemoveDirectoryW(second.c_str()),
-            "scan target cleanup failed");
+    Require(RemoveDirectoryW(first.c_str()), "status target cleanup failed");
     fixture::Reset();
-    std::puts("PASS: native folder status and isolated real Shell shortcut scan, sorting and deduplication");
-}
-
-void CheckPoliciesAndWindowsView() {
-    fixture::Reset();
-    auto policy = [](HKEY root, const wchar_t* key, const wchar_t* name) {
-        return std::to_wstring(reinterpret_cast<uintptr_t>(root)) + L"\\" + key + L"\\" + name;
-    };
-    const auto user = policy(HKEY_CURRENT_USER,
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"NoRecentDocsHistory");
-    const auto machine = policy(HKEY_LOCAL_MACHINE,
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", L"NoRecentDocsHistory");
-    const auto start = policy(HKEY_CURRENT_USER,
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", L"Start_TrackDocs");
-    Require(!WindowsRecentsTurnedOff(), "absent policies disable recents");
-    fixture::registry[user] = 1;
-    Require(WindowsRecentsTurnedOff(), "user policy did not disable recents");
-    fixture::registry[user] = 0;
-    fixture::registry[machine] = 1;
-    Require(WindowsRecentsTurnedOff(), "machine policy did not disable recents");
-    fixture::registry[machine] = 0;
-    fixture::registry[start] = 0;
-    Require(WindowsRecentsTurnedOff(), "Start setting did not disable recents");
-    fixture::storage[kRecentSourceKey] = L"windows";
-    Require(LoadRecentView({}).windowsRecentsOff, "disabled Windows history not reported in view");
-    fixture::registry[start] = 1;
-    Require(!WindowsRecentsTurnedOff(), "enabled Start setting disabled recents");
-    const std::wstring first = L"\\\\test.invalid\\first";
-    const std::wstring second = L"\\\\test.invalid\\second";
-    const std::wstring third = L"\\\\test.invalid\\third";
-    g_windowsRecentStopping = true; // Ready snapshot only: no scanner needed for this filter test.
-    g_windowsRecentsActive = false;
-    g_windowsRecentsRequested = false;
-    g_windowsRecents = {{first, 10}, {second, 20}, {second, 21}, {third, 30}};
-    g_recentSettings.history = 10;
-    fixture::storage[kWindowsRecentClearedKey] = FormatFileTime(10);
-    fixture::storage[kWindowsRecentHiddenKey] = FormatFileTime(20) + L"\t" + second;
-    auto view = LoadRecentView({third});
-    Require(view.source == RecentSource::Windows && view.folders == std::vector<std::wstring>{second},
-            "Windows view clear/hidden thresholds or bookmark filtering failed");
-    fixture::storage[kWindowsRecentHiddenKey] = FormatFileTime(21) + L"\t" + second;
-    Require(LoadRecentView({third}).folders.empty(), "hidden timestamp equality exposed recent folder");
-    SaveRecentSource(RecentSource::Explorer);
-    Require(ReadRecentSourceLocked() == RecentSource::Explorer, "Explorer source not persisted");
-    SaveRecentSource(RecentSource::Windows);
-    Require(ReadRecentSourceLocked() == RecentSource::Windows, "Windows source not persisted");
-    StopWindowsRecentWorker();
-    g_windowsRecents.clear();
-    fixture::Reset();
-    std::puts("PASS: isolated registry policies and Windows recent clear/hide/reuse filtering");
-}
-
-DWORD WINAPI ThrowingWorker(void*) {
-    return RunWindowsRecentWorker([]() -> std::vector<TimedFolder> {
-        ++scanCount;
-        SetEvent(scanEntered);
-        Require(WaitForSingleObject(releaseScan, 5000) == WAIT_OBJECT_0,
-                "throwing scan gate timed out");
-        throw winrt::hresult_error(E_FAIL);
-    });
-}
-
-void CheckWorkerFailuresAndStop() {
-    fixture::Reset();
-    StopWindowsRecentWorker(); // Repeated stop must remain safe.
-    Require(!StartWindowsRecentWorkerLocked(), "stopped worker restarted during unload state");
-    g_windowsRecentStopping = false;
-    g_unloading = true;
-    Require(!StartWindowsRecentWorkerLocked(), "worker started during mod unload");
-    g_unloading = false;
-    scanEntered = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    releaseScan = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    g_windowsRecentWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    g_windowsRecentsActive = true;
-    g_windowsRecentsScanned = false;
-    g_windowsRecentsRequested = false;
-    g_windowsRecentsScanning = false;
-    g_windowsRecents = {{L"C:\\previous", 1}};
-    g_windowsRecentThread = CreateThread(nullptr, 0, ThrowingWorker, nullptr, 0, nullptr);
-    Require(scanEntered && releaseScan && g_windowsRecentWake && g_windowsRecentThread,
-            "throwing worker setup failed");
-    CachedWindowsRecentFolders();
-    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0, "throwing scan did not start");
-    SetEvent(releaseScan);
-    WaitForScanEnd();
-    Require(CachedWindowsRecentFolders().empty() && g_windowsRecentsScanned,
-            "failed scan was not recovered as empty ready snapshot");
-    {
-        std::lock_guard lock(g_windowsRecentsMutex);
-        g_windowsRecentsScannedAt = GetTickCount64() - kWindowsRecentCacheMs;
-    }
-    CachedWindowsRecentFolders();
-    Require(WaitForSingleObject(scanEntered, 5000) == WAIT_OBJECT_0,
-            "expired snapshot did not request retry");
-    HANDLE stopped = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    std::thread stopper([&] { StopWindowsRecentWorker(); SetEvent(stopped); });
-    Require(WaitForSingleObject(stopped, 150) == WAIT_TIMEOUT,
-            "stop did not wait for pending scanner");
-    SetEvent(releaseScan);
-    Require(WaitForSingleObject(stopped, 5000) == WAIT_OBJECT_0, "worker stop failed after releasing scanner");
-    stopper.join();
-    Require(!g_windowsRecentThread && !g_windowsRecentWake && !g_windowsRecentsScanning &&
-            !g_windowsRecentsRequested, "stop leaked worker state");
-    CloseHandle(stopped);
-    CloseHandle(scanEntered);
-    CloseHandle(releaseScan);
-    g_windowsRecentsActive = false;
-    fixture::Reset();
-    std::puts("PASS: scan exceptions, cache-expiry retry, blocked scanner join and restart guards");
+    std::puts("PASS: native directory, file, missing and relative folder status");
 }
 
 void CheckIconPixelsAndCaches() {
@@ -924,13 +683,10 @@ int main(int argc, char** argv) {
     CheckStoredMutations();
     CheckSettingsAndRecents();
     CheckBackupFiles();
-    CheckWorker();
     CheckFramesAndSettings();
     CheckStorageMutex();
     CheckCallbacksAndDeferredWork();
-    CheckNativeFoldersAndRecentScan();
-    CheckPoliciesAndWindowsView();
-    CheckWorkerFailuresAndStop();
+    CheckNativeFolderStatus();
     CheckIconPixelsAndCaches();
     CheckShellSelectionAndNavigation();
     CheckShellConnections();
@@ -946,11 +702,9 @@ int main(int argc, char** argv) {
     CheckBackupSchemaAndSizeEdges();
     CheckRecentStorageAndViewEdges();
     CheckSettingsSnapshotEdges();
-    CheckWorkerWakeAndActiveGenerationEdges();
     CheckShellDiscoveryAndSelectionGaps();
     CheckNavigationEventAndTrackerGaps();
     CheckDeferredWorkAndSettingsGaps();
-    CheckActualWindowsRecentWorkerGaps();
     CheckNativeFrameAndInitializationGaps();
     CheckUninitPendingOperationAndDropGaps();
     return 0;

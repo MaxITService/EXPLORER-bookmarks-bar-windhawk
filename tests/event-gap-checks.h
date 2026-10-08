@@ -52,8 +52,7 @@ void CheckObservedFolderActionsAndWeakGuards() {
     muxc::StackPanel orphan;
     auto weakOrphan = winrt::make_weak(orphan);
     auto detached = MakeLabelButton(L"detached");
-    AttachFolderButtonHandlers(*bar.state, detached, scratch.directory, weakOrphan, false,
-                               RecentSource::Explorer);
+    AttachFolderButtonHandlers(*bar.state, detached, scratch.directory, weakOrphan, false);
     std::vector<muxi::PointerEventHandler> pointers;
     for (const auto& event : {mux::UIElement::PointerPressedEvent(), mux::UIElement::PointerMovedEvent(),
                             mux::UIElement::PointerReleasedEvent(), mux::UIElement::PointerCanceledEvent()}) {
@@ -90,43 +89,29 @@ void CheckObservedRecentMenuCallbacks() {
     ShellFixture shell;
     fixture::activeWindow = shell.frame;
     event_gap::ConfigureRecents();
-    event_gap::SuspendWindowsRecentScan scanScope; // Never scan user Recent; restore admission afterward.
     XamlBarFixture bar;
     bar.state->recentFolders = {scratch.directory, L"\\\\event.invalid\\other"};
-    bar.state->recentSource = RecentSource::Explorer;
     auto anchor = MakeLabelButton(L"RC");
     auto weakAnchor = winrt::make_weak(anchor);
     muxc::MenuFlyout menu;
     FillRecentMenu(*bar.state, menu, weakAnchor);
     auto folderItem = menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>();
     auto folderClick = event_gap::Click(folderItem);
-    auto explorerItem = menu.Items().GetAt(3).as<muxc::RadioMenuFlyoutItem>();
-    auto windowsItem = menu.Items().GetAt(4).as<muxc::RadioMenuFlyoutItem>();
-    auto explorerClick = event_gap::Click(explorerItem);
-    auto windowsClick = event_gap::Click(windowsItem);
     folderClick(folderItem, nullptr);
     Require(shell.browser->navigated == std::vector<std::wstring>{scratch.directory},
             "observed recent menu Click did not navigate folder");
     g_unloading = true;
     const auto writes = fixture::writes;
     folderClick(folderItem, nullptr);
-    explorerClick(explorerItem, nullptr);
-    windowsClick(windowsItem, nullptr);
     Require(fixture::writes == writes && shell.browser->navigated.size() == 1,
-            "unloading recent source/folder delegates changed state");
+            "unloading recent folder delegate changed state");
     g_unloading = false;
-    windowsClick(windowsItem, nullptr);
-    Require(ReadRecentSourceLocked() == RecentSource::Windows,
-            "observed Windows radio source was not saved");
-    explorerClick(explorerItem, nullptr);
-    Require(ReadRecentSourceLocked() == RecentSource::Explorer,
-            "observed Explorer radio source was not saved");
     anchor = nullptr;
     Require(!weakAnchor.get(), "weak recent menu anchor did not expire");
     folderClick(folderItem, nullptr);
     Require(shell.browser->navigated.size() == 1, "expired recent anchor navigated");
     event_gap::ResetObservers();
-    std::puts("PASS: original recent menu folder and radio-source delegates, unload and expired anchor without popup activation");
+    std::puts("PASS: original recent menu folder delegate, unload and expired anchor without popup activation");
 }
 
 void CheckObservedRecentOpeningAndClear() {
@@ -134,7 +119,6 @@ void CheckObservedRecentOpeningAndClear() {
     event_gap::ResetObservers();
     ShellFixture shell;
     event_gap::ConfigureRecents();
-    event_gap::SuspendWindowsRecentScan scanScope;
     XamlBarFixture bar;
     const std::wstring recent = L"\\\\event.invalid\\recent";
     RecordExplorerRecent(recent);
@@ -143,7 +127,9 @@ void CheckObservedRecentOpeningAndClear() {
     auto menu = rc.Flyout().as<muxc::MenuFlyout>();
     auto opening = event_gap::Opening(menu);
     opening(menu, nullptr);
-    Require(menu.Items().Size() >= 3, "observed RC Opening did not populate menu");
+    Require(menu.Items().Size() >= 1 &&
+            menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() != L"No recent folders",
+            "observed RC Opening did not populate menu");
     auto items = menu.Items().Size();
     opening(nullptr, nullptr);
     g_unloading = true;

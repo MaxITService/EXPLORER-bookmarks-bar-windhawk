@@ -31,8 +31,6 @@ inline std::map<std::wstring, std::wstring> strings;
 inline std::map<std::wstring, int> integers;
 inline bool failWrites = false;
 inline size_t writes = 0;
-inline std::wstring recentDirectory;
-inline std::map<std::wstring, DWORD> registry;
 inline bool logging = false;
 using ComCreation = HRESULT(*)(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID*);
 inline ComCreation creation = nullptr;
@@ -54,8 +52,6 @@ inline void Reset() {
     integers.clear();
     failWrites = false;
     writes = 0;
-    recentDirectory.clear();
-    registry.clear();
     logging = false;
     creation = nullptr;
     keys.clear();
@@ -121,31 +117,6 @@ inline bool HookSymbols(HMODULE, const SYMBOL_HOOK*, size_t,
     return fixture::symbolSuccess;
 }
 }
-
-inline LSTATUS WINAPI FixtureRegGetValueW(HKEY root, LPCWSTR key, LPCWSTR name,
-        DWORD, LPDWORD type, PVOID data, LPDWORD size) {
-    const auto id = std::to_wstring(reinterpret_cast<uintptr_t>(root)) + L"\\" + key + L"\\" + name;
-    const auto found = fixture::registry.find(id);
-    if (found == fixture::registry.end()) return ERROR_FILE_NOT_FOUND;
-    if (!size || *size < sizeof(DWORD)) return ERROR_MORE_DATA;
-    *size = sizeof(DWORD);
-    if (type) *type = REG_DWORD;
-    if (data) *static_cast<DWORD*>(data) = found->second;
-    return ERROR_SUCCESS;
-}
-inline HRESULT WINAPI FixtureSHGetKnownFolderPath(REFKNOWNFOLDERID id, DWORD flags,
-                                                  HANDLE token, PWSTR* result) {
-    if (id != FOLDERID_Recent || fixture::recentDirectory.empty()) {
-        return SHGetKnownFolderPath(id, flags, token, result);
-    }
-    const size_t bytes = (fixture::recentDirectory.size() + 1) * sizeof(wchar_t);
-    *result = static_cast<PWSTR>(CoTaskMemAlloc(bytes));
-    if (!*result) return E_OUTOFMEMORY;
-    memcpy(*result, fixture::recentDirectory.c_str(), bytes);
-    return S_OK;
-}
-#define RegGetValueW FixtureRegGetValueW
-#define SHGetKnownFolderPath FixtureSHGetKnownFolderPath
 
 inline BOOL WINAPI FixtureEnumWindows(WNDENUMPROC callback, LPARAM parameter) {
     struct Context { WNDENUMPROC callback; LPARAM parameter; } context{callback, parameter};

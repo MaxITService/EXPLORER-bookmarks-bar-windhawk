@@ -123,31 +123,14 @@ void CheckBackupSchemaAndSizeEdges() {
 
 void CheckRecentStorageAndViewEdges() {
     fixture::Reset();
-    std::vector<std::wstring> hiddenLines;
-    for (size_t i = 0; i < kMaxStoredRecents; ++i) {
-        hiddenLines.push_back(FormatFileTime(i + 1) + L"\t\\\\s\\folder" + std::to_wstring(i));
-    }
-    fixture::storage[kWindowsRecentHiddenKey] = JoinLines(hiddenLines);
-    HideWindowsRecentLocked(L"\\\\s\\new");
-    auto hidden = ReadHiddenWindowsRecentsLocked();
-    Require(hidden.size() == kMaxStoredRecents && hidden.front().path == L"\\\\s\\new" &&
-            hidden.back().path == L"\\\\s\\folder62",
-            "hidden history cap failed to evict oldest item");
-    HideWindowsRecentLocked(L"\\\\S\\FOLDER10");
-    hidden = ReadHiddenWindowsRecentsLocked();
-    Require(hidden.size() == kMaxStoredRecents && hidden.front().path == L"\\\\S\\FOLDER10" &&
-            std::count_if(hidden.begin(), hidden.end(), [](const auto& item) {
-                return SamePath(item.path, L"\\\\s\\folder10");
-            }) == 1, "hidden recent promotion retained a duplicate");
     fixture::storage[kRecentsKey] = L"\\\\s\\one\n\\\\s\\two";
     const auto before = fixture::storage;
     const auto writes = fixture::writes;
-    RemoveRecent(RecentSource::Explorer, L"\\\\s\\absent");
+    RemoveRecent(L"\\\\s\\absent");
     Require(fixture::storage == before && fixture::writes == writes,
             "absent recent removal wrote storage");
     fixture::failWrites = true;
-    RemoveRecent(RecentSource::Explorer, L"\\\\s\\one");
-    HideWindowsRecentLocked(L"\\\\s\\failed");
+    RemoveRecent(L"\\\\s\\one");
     Require(!RecordExplorerRecent(L"\\\\s\\failed") && fixture::storage == before,
             "failed recent write mutated persisted history");
     fixture::failWrites = false;
@@ -159,38 +142,14 @@ void CheckRecentStorageAndViewEdges() {
     fixture::attributes[L"C:\\missing"] = {INVALID_FILE_ATTRIBUTES, ERROR_PATH_NOT_FOUND};
     g_recentSettings.history = 10;
     auto view = LoadRecentView({L"\\\\S\\TWO"});
-    Require(view.source == RecentSource::Explorer && !view.windowsRecentsOff &&
-            view.folders == std::vector<std::wstring>{L"\\\\s\\one", L"\\\\s\\three"},
+    Require(view.folders == std::vector<std::wstring>{L"\\\\s\\one", L"\\\\s\\three"},
             "recent view failed missing/duplicate/case-insensitive bookmark filtering");
     g_recentSettings.history = 0;
     Require(LoadRecentView({}).folders.empty(), "zero recent history exposed an item");
 
-    const bool oldStopping = g_windowsRecentStopping;
-    const bool oldActive = g_windowsRecentsActive;
-    const bool oldRequested = g_windowsRecentsRequested;
-    const auto oldWindows = g_windowsRecents;
-    Require(!g_windowsRecentThread && !g_windowsRecentWake,
-            "recent view fixture started while a worker was live");
-    g_windowsRecentStopping = true;
-    g_windowsRecentsActive = false;
-    g_windowsRecentsRequested = false;
-    g_recentSettings.history = 10;
-    fixture::storage[kRecentSourceKey] = L"windows";
-    fixture::storage[kWindowsRecentClearedKey] = FormatFileTime(1);
-    fixture::storage[kWindowsRecentHiddenKey] = FormatFileTime(20) + L"\t\\\\s\\hidden";
-    g_windowsRecents = {{L"\\\\s\\different", 10}, {L"\\\\s\\hidden", 10},
-                       {L"\\\\s\\hidden", 21}, {L"\\\\S\\HIDDEN", 22},
-                       {L"C:\\missing", 23}, {L"\\\\s\\old", 1}};
-    view = LoadRecentView({});
-    Require(view.folders == std::vector<std::wstring>{L"\\\\s\\different", L"\\\\s\\hidden"},
-            "Windows recent view hid unrelated paths or failed reuse/deduplication/missing filtering");
-    g_windowsRecents = oldWindows;
-    g_windowsRecentStopping = oldStopping;
-    g_windowsRecentsActive = oldActive;
-    g_windowsRecentsRequested = oldRequested;
     g_recentSettings = previousSettings;
     fixture::Reset();
-    std::puts("PASS: hidden history eviction/promotion, failed recent writes and Explorer/Windows view filter edges");
+    std::puts("PASS: failed recent writes and recent view filter edges");
 }
 
 void CheckSettingsSnapshotEdges() {
@@ -229,154 +188,4 @@ void CheckSettingsSnapshotEdges() {
     UpdateThreadSettings();
     fixture::Reset();
     std::puts("PASS: valid settings, final FX slot/80-character label and generation-controlled snapshot replacement");
-}
-
-namespace branch_worker {
-struct Fixture {
-    HANDLE ready = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    HANDLE messageHandled = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    HANDLE entered = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    HANDLE release = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    std::atomic<HWND> window = nullptr;
-    ~Fixture() {
-        CloseHandle(ready);
-        CloseHandle(messageHandled);
-        CloseHandle(entered);
-        CloseHandle(release);
-    }
-    void Probe() {
-        Require(PostMessageW(window.load(), WM_APP, 0, 0), "worker probe post failed");
-        Require(WaitForSingleObject(messageHandled, 5000) == WAIT_OBJECT_0,
-                "worker message pump did not acknowledge probe");
-    }
-};
-LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
-    if (message == WM_NCCREATE) {
-        SetWindowLongPtrW(window, GWLP_USERDATA,
-            reinterpret_cast<LONG_PTR>(reinterpret_cast<CREATESTRUCTW*>(lParam)->lpCreateParams));
-    }
-    if (message == WM_APP) {
-        auto* current = reinterpret_cast<Fixture*>(GetWindowLongPtrW(window, GWLP_USERDATA));
-        SetEvent(current->messageHandled);
-        return 0;
-    }
-    return DefWindowProcW(window, message, wParam, lParam);
-}
-DWORD WINAPI Worker(void* opaque) {
-    auto& current = *static_cast<Fixture*>(opaque);
-    current.window = CreateWindowExW(0, L"BookmarksBranchWorker", L"", 0,
-                                     0, 0, 0, 0, HWND_MESSAGE, nullptr,
-                                     GetModuleHandleW(nullptr), &current);
-    Require(current.window != nullptr, "worker message window creation failed");
-    SetEvent(current.ready);
-    // Reuse the suite's scanner so coverage maps this coordinator specialization
-    // once, rather than growing the denominator for another equivalent lambda.
-    const auto result = TestWorker(nullptr);
-    DestroyWindow(current.window.load());
-    current.window = nullptr;
-    return result;
-}
-}
-
-void CheckWorkerWakeAndActiveGenerationEdges() {
-    fixture::Reset();
-    Require(!g_windowsRecentThread && !g_windowsRecentWake && !g_unloading,
-            "worker branch fixture started with live/unloading state");
-    const bool oldStopping = g_windowsRecentStopping;
-    const auto previousRecent = g_sharedRecentSettings;
-    const HANDLE previousEntered = scanEntered;
-    const HANDLE previousRelease = releaseScan;
-    const unsigned previousScanCount = scanCount;
-    WNDCLASSW windowClass{};
-    windowClass.lpfnWndProc = branch_worker::WindowProc;
-    windowClass.hInstance = GetModuleHandleW(nullptr);
-    windowClass.lpszClassName = L"BookmarksBranchWorker";
-    Require(RegisterClassW(&windowClass), "worker fixture class registration failed");
-    branch_worker::Fixture current;
-    Require(current.ready && current.messageHandled && current.entered && current.release,
-            "worker branch gate creation failed");
-    scanEntered = current.entered;
-    releaseScan = current.release;
-    scanCount = 0;
-    g_windowsRecentStopping = false;
-    g_windowsRecentsActive = true;
-    g_windowsRecentsRequested = false;
-    g_windowsRecentsScanning = false;
-    g_windowsRecentsScanned = false;
-    g_windowsRecents.clear();
-    g_windowsRecentWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    Require(g_windowsRecentWake != nullptr, "worker wake event creation failed");
-    g_windowsRecentThread = CreateThread(nullptr, 0, branch_worker::Worker, &current, 0, nullptr);
-    Require(g_windowsRecentThread && WaitForSingleObject(current.ready, 5000) == WAIT_OBJECT_0,
-            "worker branch thread setup failed");
-    SetEvent(g_windowsRecentWake);
-    current.Probe();
-    Require(scanCount == 0 && !g_windowsRecentsRequested,
-            "unrequested worker wake started a scan");
-    {
-        std::lock_guard lock(g_windowsRecentsMutex);
-        g_windowsRecentsActive = false;
-        g_windowsRecentsRequested = true;
-    }
-    SetEvent(g_windowsRecentWake);
-    current.Probe();
-    Require(scanCount == 0 && g_windowsRecentsRequested,
-            "inactive source scanned or consumed its pending request");
-    {
-        std::lock_guard lock(g_settingsMutex);
-        g_sharedRecentSettings.enabled = true;
-    }
-    fixture::storage[kRecentSourceKey] = L"windows";
-    HWND frame = CreateTestFrame();
-    UpdateWindowsRecentMode();
-    Require(WaitForSingleObject(current.entered, 5000) == WAIT_OBJECT_0,
-            "active mode transition did not start a scan");
-    const auto firstGeneration = g_windowsRecentsGeneration;
-    UpdateWindowsRecentMode(true);
-    Require(g_windowsRecentsActive && g_windowsRecentsGeneration == firstGeneration + 1,
-            "active-source invalidation did not advance generation");
-    SetEvent(current.release);
-    Require(WaitForSingleObject(current.entered, 5000) == WAIT_OBJECT_0,
-            "invalidation during scan did not run the next generation");
-    {
-        std::lock_guard lock(g_windowsRecentsMutex);
-        Require(g_windowsRecents.empty() && !g_windowsRecentsScanned && g_windowsRecentsScanning,
-                "stale scan published while source remained active");
-    }
-    MSG message{};
-    Require(!PeekMessageW(&message, frame, RefreshBarsMessage(), RefreshBarsMessage(), PM_REMOVE),
-            "discarded scan notified Explorer bars");
-    SetEvent(current.release);
-    current.Probe();
-    const auto readySnapshot = CachedWindowsRecentFolders();
-    Require(scanCount == 2 && readySnapshot.size() == 1 && readySnapshot.front().path == L"C:\\new",
-            "valid generation failed to publish its ready snapshot");
-    Require(PeekMessageW(&message, frame, RefreshBarsMessage(), RefreshBarsMessage(), PM_REMOVE),
-            "published scan failed to notify Explorer bars");
-    const auto readyGeneration = g_windowsRecentsGeneration;
-    UpdateWindowsRecentMode();
-    current.Probe();
-    Require(scanCount == 2 && g_windowsRecentsGeneration == readyGeneration &&
-            !g_windowsRecentsRequested,
-            "unchanged ready mode invalidated cache or requested a scan");
-    StopWindowsRecentWorker();
-    Require(!g_windowsRecentThread && !g_windowsRecentWake && !current.window &&
-            !g_windowsRecentsRequested && !g_windowsRecentsScanning,
-            "worker join left native resources or pending state");
-    DestroyWindow(frame);
-    Require(UnregisterClassW(windowClass.lpszClassName, windowClass.hInstance),
-            "worker fixture window class cleanup failed");
-    g_windowsRecents.clear();
-    g_windowsRecentsActive = false;
-    g_windowsRecentsScanned = false;
-    g_windowsRecentStopping = oldStopping;
-    scanEntered = previousEntered;
-    releaseScan = previousRelease;
-    scanCount = previousScanCount;
-    {
-        std::lock_guard lock(g_settingsMutex);
-        g_sharedRecentSettings = previousRecent;
-    }
-    fixture::Reset();
-    std::puts("PASS: worker message wakes, unrequested/inactive requests and active-source stale/publication generations");
 }

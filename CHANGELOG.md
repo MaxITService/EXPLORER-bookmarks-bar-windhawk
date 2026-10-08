@@ -14,9 +14,8 @@ Development source in `mods/`, not yet tested in File Explorer.
 - Right-click a bookmark to open it in a new window.
 - A short notice when the bar is full or a folder is already bookmarked.
 - **Recent folders** (off by default): up to three buttons at the right end
-  of the bar and an **RC** menu with up to ten, taken from folders opened in
-  File Explorer or from Windows recent items. Middle-click removes one; drag
-  it onto the bookmarks to keep it.
+  of the bar and an **RC** menu with up to ten folders you opened in File
+  Explorer. Middle-click removes one; drag it onto the bookmarks to keep it.
 
 ### Changed
 

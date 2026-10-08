@@ -147,16 +147,12 @@ void CheckXamlPanelRefresh() {
     auto anchor = MakeLabelButton(L"RC");
     state.visibleRecents = 0;
     FillRecentMenu(state, menu, winrt::make_weak(anchor));
-    Require(menu.Items().Size() == state.recentFolders.size() + 3,
-            "recent menu omitted folders or source controls");
+    Require(menu.Items().Size() == state.recentFolders.size(),
+            "recent menu omitted folders");
     state.visibleRecents = state.recentFolders.size();
     FillRecentMenu(state, menu, winrt::make_weak(anchor));
-    Require(menu.Items().Size() == 4 && !menu.Items().GetAt(0).IsEnabled(),
+    Require(menu.Items().Size() == 1 && !menu.Items().GetAt(0).IsEnabled(),
             "all-visible recent menu missing disabled placeholder");
-    state.windowsRecentsOff = true;
-    FillRecentMenu(state, menu, winrt::make_weak(anchor));
-    Require(menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"Windows recent items are off",
-            "disabled Windows recent explanation omitted");
     fixture::integers[L"recent.enabled"] = 0;
     LoadSettings();
     RefreshPanel(fixture.panel);
@@ -447,11 +443,14 @@ void CheckXamlMenuActionsAndNotices() {
     Require(rc.Content().as<muxc::TextBlock>().Text() == L"RC" && rc.Flyout(),
             "recent-menu fixture did not provide an RC flyout");
     auto recentMenu = rc.Flyout().as<muxc::MenuFlyout>();
-    // Test population/callbacks directly. Opening this default radio template in
-    // the CBS standalone host fail-fasts on missing TabView theme resources;
-    // that host integration remains an explicit gap (see README).
+    // Test population/callbacks directly; opening the flyout in the CBS
+    // standalone host remains an explicit gap (see README). List the recent
+    // folder in the menu rather than as a button so the menu gets a handler.
+    fixture.state->visibleRecents = 0;
     FillRecentMenu(*fixture.state, recentMenu, winrt::make_weak(rc));
-    Require(!fixture.state->recentMenuHandlers.empty(), "RC menu population omitted handlers");
+    Require(!fixture.state->recentMenuHandlers.empty() &&
+            recentMenu.Items().Size() == fixture.state->recentFolders.size(),
+            "RC menu population omitted folder handlers");
     auto clearMenu = rc.ContextFlyout().as<muxc::MenuFlyout>();
     auto clear = clearMenu.Items().GetAt(0).as<muxc::MenuFlyoutItem>();
     InvokeControl<muxc::MenuFlyoutItem, mux::Automation::Peers::MenuFlyoutItemAutomationPeer>(clear);

@@ -53,10 +53,6 @@ inline DWORD WINAPI EventGetFileAttributesW(LPCWSTR path) {
 
 namespace event_gap {
 namespace wf = winrt::Windows::Foundation;
-struct SuspendWindowsRecentScan {
-    bool prior = g_windowsRecentStopping.exchange(true);
-    ~SuspendWindowsRecentScan() { g_windowsRecentStopping = prior; }
-};
 struct ContextArgs : winrt::implements<ContextArgs, muxi::IContextRequestedEventArgs> {
     bool handled = false;
     bool Handled() { return handled; }
@@ -102,7 +98,7 @@ inline void ResetObservers() {
 }
 
 // The fixture owns a hidden standalone WinUI window with the recognized header
-// shape. It never creates Explorer hooks or opens RC's default radio template.
+// shape. It never creates Explorer hooks or opens a flyout popup.
 struct InstalledBar {
     muxc::Grid host;
     muxc::Grid nav;

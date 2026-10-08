@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.15
+// @version         0.8.16
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -65,21 +65,19 @@ nothing.
 ## Recent folders
 
 Off by default. Turn on **Recent folders → Show recent folders** to show up to
-three recent folders at the right end of the bar, newest on the right.
+three folders you recently opened in File Explorer at the right end of the
+bar, newest on the right.
 
-- Left-click **RC** for the rest of the list (up to 10 in total) and to pick
-  the source: folders opened in File Explorer, or Windows recent items (read
-  only when the Recent folder is on a local fixed drive).
-- Right-click **RC** to clear the list. For Windows recent items this only
-  hides them from the bar.
+- Left-click **RC** for the rest of the list (up to 10 in total).
+- Right-click **RC** to clear the list.
 - Middle-click a recent folder to remove it; drag it onto the bookmarks to
   keep it.
 - Bookmarked and missing folders are skipped. In a narrow window the buttons
   move into RC.
 
 The mod keeps up to 64 folders opened in File Explorer in its local storage,
-even while the feature is off. To erase them, turn the feature on, pick
-*Folders opened in File Explorer* in the RC menu, and right-click RC.
+even while the feature is off. To erase them, turn the feature on and
+right-click RC.
 
 ## If the bar doesn't appear
 
@@ -118,7 +116,7 @@ and check the Windhawk log.
     #! $max: 10
   - rcButton: menu
     $name: RC button
-    $description: Menu with the other recent folders and the source.
+    $description: Menu with the other recent folders.
     $options:
     - menu: Shown; right-click opens Clear
     - clear: Shown; right-click clears at once
@@ -221,20 +219,11 @@ constexpr size_t kFixedButtons = 2;
 constexpr float kDragThreshold = 6.0f;
 constexpr wchar_t kBookmarksKey[] = L"folders";
 constexpr wchar_t kRecentsKey[] = L"recentFolders";
-constexpr wchar_t kRecentSourceKey[] = L"recentSource";
-constexpr wchar_t kWindowsRecentClearedKey[] = L"windowsRecentClearedAt";
-constexpr wchar_t kWindowsRecentHiddenKey[] = L"windowsRecentHidden";
 // More entries than can be listed are kept, so filtering out bookmarks and
 // missing folders still leaves enough recent folders to show.
 constexpr size_t kMaxStoredRecents = 64;
 constexpr int kMaxRecentButtons = 3;
 constexpr int kMaxRecentHistory = 10;
-// A single STA worker reads the newest links. Bookmarks are removed afterwards,
-// so collect room for every bookmark plus a full list of kMaxRecentHistory.
-constexpr size_t kMaxRecentLinksScanned = 128;
-constexpr size_t kMaxWindowsRecentFolders =
-    kMaxBookmarks + static_cast<size_t>(kMaxRecentHistory);
-constexpr ULONGLONG kWindowsRecentCacheMs = 5000;
 
 constexpr double RowAllocation(unsigned rows) {
     return kRowHeight * rows + kInterRowGap * (rows - 1);
@@ -262,7 +251,6 @@ constexpr DISPID kDispidWindowRevoked = 201;
 constexpr DISPID kDispidNavigateComplete2 = 252;
 constexpr DISPID kDispidDocumentComplete = 259;
 
-enum class RecentSource { Explorer, Windows };
 enum class FolderStatus { Available, Missing, Unknown };
 
 struct RecentSettings {
@@ -303,7 +291,6 @@ bool UpdateThreadSettings() {
 }
 
 void NotifyExplorerBars();
-void UpdateWindowsRecentMode(bool invalidate = false);
 void ScheduleThreadWork();
 bool TrackFrame(HWND window);
 
@@ -389,8 +376,6 @@ struct BarState {
     // Newest first. The first visibleRecents entries have buttons; the RC
     // menu lists the rest.
     std::vector<std::wstring> recentFolders;
-    RecentSource recentSource = RecentSource::Explorer;
-    bool windowsRecentsOff = false;
     size_t recentButtonCount = 0;
     bool hasRecentMenuButton = false;
     size_t visibleRecents = 0;
@@ -1243,44 +1228,6 @@ void LoadSettings() {
            recent.history, rcMode.data());
 }
 
-ULONGLONG FileTimeValue(const FILETIME& time) {
-    return (static_cast<ULONGLONG>(time.dwHighDateTime) << 32) |
-           time.dwLowDateTime;
-}
-
-ULONGLONG CurrentFileTime() {
-    FILETIME now{};
-    GetSystemTimeAsFileTime(&now);
-    return FileTimeValue(now);
-}
-
-ULONGLONG ParseFileTime(const std::wstring& text) {
-    return text.empty() ? 0 : wcstoull(text.c_str(), nullptr, 16);
-}
-
-std::wstring FormatFileTime(ULONGLONG time) {
-    wchar_t text[17]{};
-    swprintf(text, ARRAYSIZE(text), L"%016llX", time);
-    return text;
-}
-
-RecentSource ReadRecentSourceLocked() {
-    return ReadValueLocked(kRecentSourceKey) == L"windows"
-               ? RecentSource::Windows
-               : RecentSource::Explorer;
-}
-
-void SaveRecentSource(RecentSource source) {
-    {
-        std::lock_guard lock(g_storageMutex);
-        Wh_SetStringValue(kRecentSourceKey, source == RecentSource::Windows
-                                                 ? L"windows"
-                                                 : L"explorer");
-    }
-    UpdateWindowsRecentMode();
-    NotifyExplorerBars();
-}
-
 // Returns true when the stored order changed.
 bool RecordExplorerRecent(std::wstring path) {
     path = NormalizePath(std::move(path));
@@ -1300,48 +1247,8 @@ bool RecordExplorerRecent(std::wstring path) {
     return SaveLinesLocked(kRecentsKey, std::move(recents));
 }
 
-// A hidden Windows recent item stays hidden until Windows records a newer use.
-struct HiddenRecent {
-    ULONGLONG hiddenAt = 0;
-    std::wstring path;
-};
-
-std::vector<HiddenRecent> ReadHiddenWindowsRecentsLocked() {
-    std::vector<HiddenRecent> hidden;
-    for (const auto& line : SplitLines(ReadValueLocked(kWindowsRecentHiddenKey),
-                                       kMaxStoredRecents)) {
-        size_t tab = line.find(L'\t');
-        if (tab == std::wstring::npos || tab + 1 == line.size()) {
-            continue;
-        }
-        hidden.push_back({ParseFileTime(line.substr(0, tab)),
-                          NormalizePath(line.substr(tab + 1))});
-    }
-    return hidden;
-}
-
-void HideWindowsRecentLocked(const std::wstring& path) {
-    auto hidden = ReadHiddenWindowsRecentsLocked();
-    std::erase_if(hidden, [&](const auto& entry) {
-        return SamePath(entry.path, path);
-    });
-    hidden.insert(hidden.begin(), HiddenRecent{CurrentFileTime(), path});
-    if (hidden.size() > kMaxStoredRecents) {
-        hidden.resize(kMaxStoredRecents);
-    }
-    std::vector<std::wstring> lines;
-    for (const auto& entry : hidden) {
-        lines.push_back(FormatFileTime(entry.hiddenAt) + L'\t' + entry.path);
-    }
-    SaveLinesLocked(kWindowsRecentHiddenKey, std::move(lines));
-}
-
-void RemoveRecent(RecentSource source, const std::wstring& path) {
+void RemoveRecent(const std::wstring& path) {
     std::lock_guard lock(g_storageMutex);
-    if (source == RecentSource::Windows) {
-        HideWindowsRecentLocked(path);
-        return;
-    }
     auto recents = SplitPaths(ReadValueLocked(kRecentsKey), kMaxStoredRecents);
     size_t oldSize = recents.size();
     std::erase_if(recents, [&](const auto& old) { return SamePath(old, path); });
@@ -1350,305 +1257,15 @@ void RemoveRecent(RecentSource source, const std::wstring& path) {
     }
 }
 
-// Clearing Windows recent items only hides them from the bar; the shortcuts
-// in the user's Recent folder belong to Windows and are left untouched.
-void ClearRecents(RecentSource source) {
+void ClearRecents() {
     {
         std::lock_guard lock(g_storageMutex);
-        if (source == RecentSource::Windows) {
-            Wh_SetStringValue(kWindowsRecentClearedKey,
-                              FormatFileTime(CurrentFileTime()).c_str());
-            Wh_SetStringValue(kWindowsRecentHiddenKey, L"");
-        } else {
-            Wh_SetStringValue(kRecentsKey, L"");
-        }
+        Wh_SetStringValue(kRecentsKey, L"");
     }
     NotifyExplorerBars();
 }
 
-bool ReadRegistryDword(HKEY root, const wchar_t* key, const wchar_t* name,
-                       DWORD& value) {
-    DWORD size = sizeof(value);
-    return RegGetValueW(root, key, name, RRF_RT_REG_DWORD, nullptr, &value,
-                        &size) == ERROR_SUCCESS;
-}
-
-// Windows stops adding recent items when the user turns off recent files in
-// Start settings or a policy disables recent document history.
-bool WindowsRecentsTurnedOff() {
-    constexpr wchar_t kPolicies[] =
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer";
-    constexpr wchar_t kAdvanced[] =
-        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
-    DWORD value = 0;
-    if ((ReadRegistryDword(HKEY_CURRENT_USER, kPolicies,
-                           L"NoRecentDocsHistory", value) && value) ||
-        (ReadRegistryDword(HKEY_LOCAL_MACHINE, kPolicies,
-                           L"NoRecentDocsHistory", value) && value)) {
-        return true;
-    }
-    return ReadRegistryDword(HKEY_CURRENT_USER, kAdvanced, L"Start_TrackDocs",
-                             value) && value == 0;
-}
-
-struct TimedFolder {
-    std::wstring path;
-    ULONGLONG usedAt = 0;
-};
-
-// Windows adds a shortcut to the folder of each opened file to the Recent
-// folder. The shortcut's stored attributes identify folder targets without
-// touching possibly slow network or removable storage. The Recent folder
-// itself is read only when it is on a local fixed drive.
-std::atomic<bool> g_windowsRecentStopping = false;
-
-std::vector<TimedFolder> ScanWindowsRecentFolders() {
-    std::vector<TimedFolder> folders;
-    auto directory = KnownFolderPath(FOLDERID_Recent);
-    if (directory.empty()) {
-        return folders;
-    }
-    if (CheckFolderStatus(directory) != FolderStatus::Available) {
-        Wh_Log(L"Windows recent items skipped: the Recent folder is missing "
-               L"or not on a local fixed drive");
-        return folders;
-    }
-    struct LinkFile {
-        std::wstring name;
-        ULONGLONG writtenAt = 0;
-    };
-    std::vector<LinkFile> links;
-    WIN32_FIND_DATAW data{};
-    HANDLE find = FindFirstFileExW((directory + L"\\*.lnk").c_str(),
-                                   FindExInfoBasic, &data,
-                                   FindExSearchNameMatch, nullptr,
-                                   FIND_FIRST_EX_LARGE_FETCH);
-    if (find == INVALID_HANDLE_VALUE) {
-        return folders;
-    }
-    std::unique_ptr<void, decltype(&FindClose)> closeFind(find, FindClose);
-    do {
-        if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-            links.push_back({data.cFileName, FileTimeValue(data.ftLastWriteTime)});
-        }
-    } while (!g_windowsRecentStopping && links.size() < 4096 &&
-             FindNextFileW(find, &data));
-    closeFind.reset();
-    std::sort(links.begin(), links.end(), [](const auto& a, const auto& b) {
-        return a.writtenAt > b.writtenAt;
-    });
-    if (links.size() > kMaxRecentLinksScanned) {
-        links.resize(kMaxRecentLinksScanned);
-    }
-    for (const auto& link : links) {
-        if (g_windowsRecentStopping ||
-            folders.size() >= kMaxWindowsRecentFolders) {
-            break;
-        }
-        winrt::com_ptr<IShellLinkW> shellLink;
-        if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr,
-                                    CLSCTX_INPROC_SERVER,
-                                    IID_PPV_ARGS(shellLink.put())))) {
-            break;
-        }
-        auto file = shellLink.try_as<IPersistFile>();
-        if (!file ||
-            FAILED(file->Load((directory + L"\\" + link.name).c_str(),
-                              STGM_READ))) {
-            continue;
-        }
-        wchar_t target[MAX_PATH]{};
-        WIN32_FIND_DATAW targetData{};
-        if (shellLink->GetPath(target, ARRAYSIZE(target), &targetData, 0) !=
-                S_OK ||
-            !target[0]) {
-            continue;
-        }
-        auto path = NormalizePath(target);
-        if (!IsAbsoluteFolderPath(path) ||
-            std::any_of(folders.begin(), folders.end(), [&](const auto& old) {
-                return SamePath(old.path, path);
-            })) {
-            continue;
-        }
-        bool folder = targetData.dwFileAttributes
-                          ? (targetData.dwFileAttributes &
-                             FILE_ATTRIBUTE_DIRECTORY) != 0
-                          : CheckFolderStatus(path) == FolderStatus::Available;
-        if (folder) {
-            folders.push_back({std::move(path), link.writtenAt});
-        }
-    }
-    return folders;
-}
-
-std::mutex g_windowsRecentsMutex;
-std::vector<TimedFolder> g_windowsRecents;
-ULONGLONG g_windowsRecentsScannedAt = 0;
-bool g_windowsRecentsScanned = false;
-bool g_windowsRecentsActive = false;
-bool g_windowsRecentsRequested = false;
-bool g_windowsRecentsScanning = false;
-ULONGLONG g_windowsRecentsGeneration = 0;
-HANDLE g_windowsRecentWake = nullptr;
-HANDLE g_windowsRecentThread = nullptr;
-
-template <typename Scan>
-DWORD RunWindowsRecentWorker(Scan scan) {
-    ComScope com;
-    for (;;) {
-        DWORD wait = MsgWaitForMultipleObjectsEx(
-            1, &g_windowsRecentWake, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
-        if (g_windowsRecentStopping || wait == WAIT_FAILED) {
-            break;
-        }
-        if (wait == WAIT_OBJECT_0 + 1) {
-            MSG message;
-            while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
-                TranslateMessage(&message);
-                DispatchMessageW(&message);
-            }
-            continue;
-        }
-        ULONGLONG generation;
-        {
-            std::lock_guard lock(g_windowsRecentsMutex);
-            if (!g_windowsRecentsRequested || !g_windowsRecentsActive) {
-                continue;
-            }
-            g_windowsRecentsRequested = false;
-            g_windowsRecentsScanning = true;
-            generation = g_windowsRecentsGeneration;
-        }
-        const ULONGLONG startedAt = GetTickCount64();
-        std::vector<TimedFolder> folders;
-        try {
-            winrt::check_hresult(com.result);
-            folders = scan();
-        } catch (...) {
-            Wh_Log(L"Windows recent worker scan failed: %08X",
-                   winrt::to_hresult().value);
-        }
-        const ULONGLONG finishedAt = GetTickCount64();
-        const size_t count = folders.size();
-        bool published = false;
-        {
-            std::lock_guard lock(g_windowsRecentsMutex);
-            g_windowsRecentsScanning = false;
-            if (!g_windowsRecentStopping && g_windowsRecentsActive &&
-                generation == g_windowsRecentsGeneration) {
-                g_windowsRecents = std::move(folders);
-                g_windowsRecentsScannedAt = finishedAt;
-                g_windowsRecentsScanned = true;
-                published = true;
-            }
-        }
-        Wh_Log(L"Windows recent worker: %zu folder(s), %llu ms, published=%d",
-               count, finishedAt - startedAt, published ? 1 : 0);
-        if (published) {
-            NotifyExplorerBars();
-        }
-    }
-    return 0;
-}
-
-DWORD WINAPI WindowsRecentWorkerProc(void*) {
-    return RunWindowsRecentWorker(ScanWindowsRecentFolders);
-}
-
-// Caller holds the cache mutex. No COM or filesystem work runs under it.
-bool StartWindowsRecentWorkerLocked() {
-    if (g_windowsRecentThread) {
-        return true;
-    }
-    if (g_windowsRecentStopping || g_unloading) {
-        return false;
-    }
-    g_windowsRecentWake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (!g_windowsRecentWake) {
-        const DWORD error = GetLastError();
-        Wh_Log(L"Could not create Windows recent worker event: %u", error);
-        return false;
-    }
-    g_windowsRecentThread = CreateThread(
-        nullptr, 0, WindowsRecentWorkerProc, nullptr, 0, nullptr);
-    if (!g_windowsRecentThread) {
-        const DWORD error = GetLastError();
-        CloseHandle(g_windowsRecentWake);
-        g_windowsRecentWake = nullptr;
-        Wh_Log(L"Could not start Windows recent worker: %u", error);
-        return false;
-    }
-    return true;
-}
-
-void UpdateWindowsRecentMode(bool invalidate) {
-    // Keep a concurrent settings/source save from being overwritten by a mode
-    // decision made with an older configuration. No scan runs under these locks.
-    std::lock_guard settingsLock(g_settingsMutex);
-    std::lock_guard storageLock(g_storageMutex);
-    const bool active = g_sharedRecentSettings.enabled &&
-                        ReadRecentSourceLocked() == RecentSource::Windows &&
-                        !WindowsRecentsTurnedOff();
-    std::lock_guard lock(g_windowsRecentsMutex);
-    if (active != g_windowsRecentsActive || invalidate) {
-        g_windowsRecentsActive = active;
-        ++g_windowsRecentsGeneration;
-        g_windowsRecents.clear();
-        g_windowsRecentsScanned = false;
-        g_windowsRecentsRequested = active;
-    }
-    if (g_windowsRecentsRequested && active &&
-        StartWindowsRecentWorkerLocked()) {
-        SetEvent(g_windowsRecentWake);
-    }
-}
-
-std::vector<TimedFolder> CachedWindowsRecentFolders() {
-    std::lock_guard lock(g_windowsRecentsMutex);
-    ULONGLONG now = GetTickCount64();
-    if (g_windowsRecentsActive && !g_windowsRecentsScanning &&
-        (!g_windowsRecentsScanned ||
-         now - g_windowsRecentsScannedAt >= kWindowsRecentCacheMs)) {
-        g_windowsRecentsRequested = true;
-    }
-    if (g_windowsRecentsRequested && StartWindowsRecentWorkerLocked()) {
-        SetEvent(g_windowsRecentWake);
-    }
-    // Never wait for a scan. Keep the last completed snapshot until it finishes.
-    return g_windowsRecents;
-}
-
-void StopWindowsRecentWorker() {
-    HANDLE thread;
-    {
-        std::lock_guard lock(g_windowsRecentsMutex);
-        g_windowsRecentStopping = true;
-        thread = g_windowsRecentThread;
-        if (g_windowsRecentWake) {
-            SetEvent(g_windowsRecentWake);
-        }
-    }
-    if (thread) {
-        while (WaitForSingleObject(thread, 100) == WAIT_TIMEOUT) {
-            CancelSynchronousIo(thread);
-        }
-    }
-    std::lock_guard lock(g_windowsRecentsMutex);
-    if (g_windowsRecentThread) {
-        CloseHandle(g_windowsRecentThread);
-        g_windowsRecentThread = nullptr;
-    }
-    if (g_windowsRecentWake) {
-        CloseHandle(g_windowsRecentWake);
-        g_windowsRecentWake = nullptr;
-    }
-    g_windowsRecentsRequested = false;
-}
-
 struct RecentView {
-    RecentSource source = RecentSource::Explorer;
-    bool windowsRecentsOff = false;
     // Newest first, at most the configured history length.
     std::vector<std::wstring> folders;
 };
@@ -1656,35 +1273,9 @@ struct RecentView {
 RecentView LoadRecentView(const std::vector<std::wstring>& bookmarks) {
     RecentView view;
     std::vector<std::wstring> candidates;
-    ULONGLONG clearedAt = 0;
-    std::vector<HiddenRecent> hidden;
     {
         std::lock_guard lock(g_storageMutex);
-        view.source = ReadRecentSourceLocked();
-        if (view.source == RecentSource::Explorer) {
-            candidates =
-                SplitPaths(ReadValueLocked(kRecentsKey), kMaxStoredRecents);
-        } else {
-            clearedAt = ParseFileTime(ReadValueLocked(kWindowsRecentClearedKey));
-            hidden = ReadHiddenWindowsRecentsLocked();
-        }
-    }
-    if (view.source == RecentSource::Windows) {
-        if (WindowsRecentsTurnedOff()) {
-            view.windowsRecentsOff = true;
-            return view;
-        }
-        for (auto& entry : CachedWindowsRecentFolders()) {
-            bool hide = entry.usedAt <= clearedAt ||
-                        std::any_of(hidden.begin(), hidden.end(),
-                                    [&](const auto& item) {
-                                        return entry.usedAt <= item.hiddenAt &&
-                                               SamePath(item.path, entry.path);
-                                    });
-            if (!hide) {
-                candidates.push_back(std::move(entry.path));
-            }
-        }
+        candidates = SplitPaths(ReadValueLocked(kRecentsKey), kMaxStoredRecents);
     }
     for (auto& path : candidates) {
         if (view.folders.size() >= g_recentSettings.history) {
@@ -2846,14 +2437,14 @@ bool PointerInsideStrip(const BarState& state,
 void AttachFolderButtonHandlers(BarState& state, const muxc::Button& button,
                                 const std::wstring& path,
                                 const winrt::weak_ref<muxc::StackPanel>& weakPanel,
-                                bool recent, RecentSource source) {
+                                bool recent) {
     auto& handlers = recent ? state.recentHandlers : state.panelHandlers;
     // Buttons consume left presses. AddHandler receives them after the
     // class handler and keeps ordinary Click behavior for a short press.
     TrackPointer(handlers, button,
         mux::UIElement::PointerPressedEvent(),
         muxi::PointerEventHandler{
-            [path, weakPanel, recent, source](
+            [path, weakPanel, recent](
                 const winrt::Windows::Foundation::IInspectable& sender,
                 const muxi::PointerRoutedEventArgs& args) {
                 if (g_unloading) {
@@ -2870,7 +2461,7 @@ void AttachFolderButtonHandlers(BarState& state, const muxc::Button& button,
                     args.Handled(true);
                     ClearDrag(*state);
                     if (recent) {
-                        RemoveRecent(source, path);
+                        RemoveRecent(path);
                         RefreshPanel(panel);
                     } else if (RemoveBookmark(path)) {
                         RefreshPanel(panel);
@@ -3017,11 +2608,10 @@ void ClearRecentsFromBar(const winrt::weak_ref<muxc::StackPanel>& weakPanel) {
         return;
     }
     auto panel = weakPanel.get();
-    auto state = panel ? FindState(panel) : nullptr;
-    if (!state) {
+    if (!panel || !FindState(panel)) {
         return;
     }
-    ClearRecents(state->recentSource);
+    ClearRecents();
     RefreshThreadBars();
 }
 
@@ -3041,13 +2631,7 @@ void FillRecentMenu(BarState& state, const muxc::MenuFlyout& menu,
                     const winrt::weak_ref<muxc::Button>& weakAnchor) {
     RevokeHandlers(state.recentMenuHandlers);
     menu.Items().Clear();
-    if (state.windowsRecentsOff) {
-        AppendDisabledMenuItem(
-            menu, L"Windows recent items are off",
-            L"Turned off in Settings > Personalization > Start, or by "
-            L"policy. Pick \"Folders opened in File Explorer\" below, or "
-            L"turn them on in Windows.");
-    } else if (state.visibleRecents >= state.recentFolders.size()) {
+    if (state.visibleRecents >= state.recentFolders.size()) {
         AppendDisabledMenuItem(menu, state.recentFolders.empty()
                                          ? L"No recent folders"
                                          : L"No other recent folders");
@@ -3069,25 +2653,6 @@ void FillRecentMenu(BarState& state, const muxc::MenuFlyout& menu,
             menu.Items().Append(item);
         }
     }
-    menu.Items().Append(muxc::MenuFlyoutSeparator{});
-    auto appendSource = [&](const wchar_t* text, RecentSource source) {
-        muxc::RadioMenuFlyoutItem item;
-        item.Text(text);
-        item.GroupName(L"RecentSource");
-        item.IsChecked(state.recentSource == source);
-        TrackClick(state.recentMenuHandlers, item, [source](
-                       const winrt::Windows::Foundation::IInspectable&,
-                       const mux::RoutedEventArgs&) {
-            if (g_unloading) {
-                return;
-            }
-            SaveRecentSource(source);
-            RefreshThreadBars();
-        });
-        menu.Items().Append(item);
-    };
-    appendSource(L"Folders opened in File Explorer", RecentSource::Explorer);
-    appendSource(L"Windows recent items", RecentSource::Windows);
 }
 
 void AppendRecents(BarState& state, const muxc::StackPanel& recents,
@@ -3109,13 +2674,12 @@ void AppendRecents(BarState& state, const muxc::StackPanel& recents,
         const FolderStatus status = CheckFolderStatus(path);
         auto button = MakeFolderButton(path, status, FolderTooltip(path, status, true));
         RememberFolderButton(state.recentFolderButtons, path, button, status);
-        AttachFolderButtonHandlers(state, button, path, weakPanel, true,
-                                   state.recentSource);
+        AttachFolderButtonHandlers(state, button, path, weakPanel, true);
         recents.Children().Append(button);
     }
 
-    // RC stays available while no recent folder has a button, so the source
-    // can always be changed.
+    // RC stays available while no recent folder has a button, so the feature
+    // remains visible and its list can still be cleared.
     state.hasRecentMenuButton =
         g_recentSettings.menuButton || state.recentButtonCount == 0;
     if (!state.hasRecentMenuButton) {
@@ -3127,10 +2691,9 @@ void AppendRecents(BarState& state, const muxc::StackPanel& recents,
     muxc::ToolTipService::SetToolTip(
         rcButton,
         winrt::box_value(g_recentSettings.rightClickClears
-                             ? L"More recent folders, source choice; "
-                               L"right-click clears immediately"
-                             : L"More recent folders, source choice; "
-                               L"right-click to clear"));
+                             ? L"More recent folders; right-click clears "
+                               L"immediately"
+                             : L"More recent folders; right-click to clear"));
     auto weakRc = winrt::make_weak(rcButton);
     muxc::MenuFlyout recentMenu;
     TrackOpening(state.recentHandlers, recentMenu, [weakPanel, weakRc](
@@ -3175,8 +2738,6 @@ void RefreshRecentPanel(BarState& state, RecentView view,
     RevokeHandlers(state.recentHandlers);
     state.recentFolderButtons.clear();
     state.recentFolders = std::move(view.folders);
-    state.recentSource = view.source;
-    state.windowsRecentsOff = view.windowsRecentsOff;
     state.recentButtonCount = 0;
     state.hasRecentMenuButton = false;
     state.visibleRecents = 0;
@@ -3213,12 +2774,6 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
     std::wstring recentKey;
     if (g_recentSettings.enabled) {
         recentView = LoadRecentView(bookmarks);
-        recentKey += recentView.source == RecentSource::Windows
-                         ? L"\x1f" L"W"
-                         : L"\x1f" L"E";
-        if (recentView.windowsRecentsOff) {
-            recentKey += L"\x1f" L"off";
-        }
         for (const auto& path : recentView.folders) {
             recentKey += L'\x1f';
             recentKey += path;
@@ -3487,8 +3042,7 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
         FolderStatus status = CheckFolderStatus(path);
         auto button = MakeFolderButton(path, status, FolderTooltip(path, status, false));
         RememberFolderButton(state->folderButtons, path, button, status);
-        AttachFolderButtonHandlers(*state, button, path, weakPanel, false,
-                                   recentView.source);
+        AttachFolderButtonHandlers(*state, button, path, weakPanel, false);
         firstRow.Children().Append(button);
     }
 
@@ -3772,7 +3326,6 @@ void RunThreadWork() {
             Wh_Log(L"UI thread applying settings generation %llu",
                    g_threadSettingsGeneration);
         }
-        UpdateWindowsRecentMode();
         while (!g_unloading && !g_threadClosing && (g_recentSyncPending || g_refreshPending ||
                                 g_bookmarkTogglePending)) {
             if (HWND window = std::exchange(g_bookmarkTogglePending, nullptr)) {
@@ -5019,7 +4572,6 @@ void Wh_ModAfterInit() {
 void Wh_ModSettingsChanged() {
     try {
         LoadSettings();
-        UpdateWindowsRecentMode(true);
         NotifyExplorerBars();
         Wh_Log(L"Settings published without reloading the mod: generation %llu",
                g_settingsGeneration.load());
@@ -5034,7 +4586,6 @@ void Wh_ModBeforeUninit() {
 
 void Wh_ModUninit() {
     BeginUnloading();
-    StopWindowsRecentWorker();
     for (;;) {
         ForExplorerWindows(CloseActiveDialogCurrentThread);
         std::unique_lock lock(g_operationMutex);

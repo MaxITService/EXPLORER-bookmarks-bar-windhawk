@@ -94,8 +94,8 @@ void CheckEncodingAndKnownFolderFailures() {
     }
     f.knownFolder = true;
     f.knownFolderResult = E_ACCESSDENIED;
-    Require(SuggestedBackupPath().empty() && KnownFolderPath(FOLDERID_Recent).empty() &&
-            ScanWindowsRecentFolders().empty(), "failed known folder lookup returned a usable path");
+    Require(SuggestedBackupPath().empty() && KnownFolderPath(FOLDERID_Desktop).empty(),
+            "failed known folder lookup returned a usable path");
     f.knownFolderResult = S_OK;
     f.nullKnownFolder = true;
     Require(SuggestedBackupPath().empty() && KnownFolderPath(FOLDERID_Desktop).empty(),
@@ -122,64 +122,6 @@ void CheckEncodingAndKnownFolderFailures() {
     Require(DriveMenuLabel(L"Z:\\") == L"Z: — Test volume", "volume name was ignored");
     fixture::drives.clear();
     std::puts("PASS: encoding completion, environment size races, known-folder failures/null/empty values and volume labels");
-}
-
-inline std::atomic<unsigned> platformApartmentScans{0};
-DWORD WINAPI PlatformFailedApartmentWorker(void*) {
-    return RunWindowsRecentWorker([] {
-        ++platformApartmentScans;
-        return std::vector<TimedFolder>{{L"C:\\should-not-publish", 1}};
-    });
-}
-void CheckWorkerPlatformFailures() {
-    platform_failure::Scope isolated;
-    StopWindowsRecentWorker();
-    g_windowsRecentStopping = false;
-    g_unloading = false;
-    auto& f = platform_failure::faults;
-    DWORD before = 0;
-    DWORD after = 0;
-    Require(GetProcessHandleCount(GetCurrentProcess(), &before), "worker handle count query failed");
-    f.event = true;
-    Require(!StartWindowsRecentWorkerLocked() && !g_windowsRecentWake && !g_windowsRecentThread,
-            "failed worker event creation published handles");
-    f.event = false;
-    f.thread = true;
-    Require(!StartWindowsRecentWorkerLocked() && !g_windowsRecentWake && !g_windowsRecentThread,
-            "failed worker thread creation retained event handle");
-    f.thread = false;
-    Require(GetProcessHandleCount(GetCurrentProcess(), &after) && after == before,
-            "worker creation failure leaked a native handle");
-    f.wait = true;
-    unsigned scans = 0;
-    Require(RunWindowsRecentWorker([&] { ++scans; return std::vector<TimedFolder>{}; }) == 0 && !scans,
-            "failed worker wait ran a scan or failed to exit");
-    f.wait = false;
-    f.coInitialize = true;
-    platformApartmentScans = 0;
-    g_windowsRecentsActive = true;
-    g_windowsRecentsRequested = true;
-    g_windowsRecentsScanning = false;
-    g_windowsRecentsScanned = false;
-    g_windowsRecents = {{L"C:\\old", 1}};
-    g_windowsRecentWake = CreateEventW(nullptr, FALSE, TRUE, nullptr);
-    g_windowsRecentThread = CreateThread(nullptr, 0, PlatformFailedApartmentWorker, nullptr, 0, nullptr);
-    Require(g_windowsRecentWake && g_windowsRecentThread, "failed-apartment worker fixture creation failed");
-    const auto deadline = GetTickCount64() + 5000;
-    for (;;) {
-        bool ready;
-        { std::lock_guard lock(g_windowsRecentsMutex); ready = g_windowsRecentsScanned; }
-        if (ready) break;
-        Require(GetTickCount64() < deadline, "failed-apartment worker did not publish a safe result");
-        Sleep(1);
-    }
-    StopWindowsRecentWorker();
-    Require(platformApartmentScans == 0 && g_windowsRecents.empty() && !g_windowsRecentsScanning &&
-            !g_windowsRecentThread && !g_windowsRecentWake,
-            "failed COM apartment ran scanner, retained stale folders or leaked worker handles");
-    g_windowsRecentsActive = false;
-    g_windowsRecentStopping = false;
-    std::puts("PASS: worker event/thread allocation cleanup, failed wait and COM apartment scan suppression");
 }
 
 namespace platform_failure {
@@ -313,162 +255,8 @@ void CheckIconPlatformFailures() {
     std::puts("PASS: Shell/WIC icon failures, dimension bounds, exact BGRA conversion and icon/COM cleanup");
 }
 
-namespace platform_failure {
-struct LinkBehavior {
-    std::wstring path = L"C:\\valid";
-    DWORD attributes = FILE_ATTRIBUTE_DIRECTORY;
-    HRESULT load = S_OK;
-    HRESULT getPath = S_OK;
-};
-inline std::map<std::wstring, LinkBehavior> links;
-inline bool linkCreationFailure = false;
-inline bool persistInterface = true;
-inline unsigned linkLoads = 0;
-inline unsigned linkLive = 0;
-struct RecentLink : IShellLinkW, IPersistFile {
-    ULONG refs = 1;
-    LinkBehavior behavior;
-    RecentLink() { ++linkLive; }
-    virtual ~RecentLink() { --linkLive; }
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
-        if (!out) return E_POINTER;
-        *out = nullptr;
-        if (iid == IID_IUnknown || iid == IID_IShellLinkW) *out = static_cast<IShellLinkW*>(this);
-        else if (persistInterface && (iid == IID_IPersist || iid == IID_IPersistFile)) *out = static_cast<IPersistFile*>(this);
-        else return E_NOINTERFACE;
-        AddRef();
-        return S_OK;
-    }
-    ULONG STDMETHODCALLTYPE AddRef() override { return ++refs; }
-    ULONG STDMETHODCALLTYPE Release() override { const auto count = --refs; if (!count) delete this; return count; }
-    HRESULT STDMETHODCALLTYPE Load(LPCOLESTR path, DWORD mode) override {
-        ++linkLoads;
-        Require(mode == STGM_READ, "Recent shortcut scanner requested writable access");
-        std::wstring file(path);
-        const auto found = links.find(file.substr(file.find_last_of(L'\\') + 1));
-        if (found == links.end()) return E_FAIL;
-        behavior = found->second;
-        return behavior.load;
-    }
-    HRESULT STDMETHODCALLTYPE GetPath(LPWSTR out, int count, WIN32_FIND_DATAW* data, DWORD flags) override {
-        Require(flags == 0 && count > 0 && data, "Recent shortcut path query changed flags or omitted attributes");
-        const size_t length = std::min<size_t>(behavior.path.size(), count - 1);
-        std::copy_n(behavior.path.begin(), length, out);
-        out[length] = 0;
-        data->dwFileAttributes = behavior.attributes;
-        return behavior.getPath;
-    }
-    HRESULT STDMETHODCALLTYPE GetIDList(PIDLIST_ABSOLUTE*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetIDList(PCIDLIST_ABSOLUTE) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetDescription(LPWSTR, int) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetDescription(LPCWSTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetWorkingDirectory(LPWSTR, int) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetWorkingDirectory(LPCWSTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetArguments(LPWSTR, int) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetArguments(LPCWSTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetHotkey(WORD*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetHotkey(WORD) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetShowCmd(int*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetShowCmd(int) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetIconLocation(LPWSTR, int, int*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetIconLocation(LPCWSTR, int) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetRelativePath(LPCWSTR, DWORD) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE Resolve(HWND, DWORD) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SetPath(LPCWSTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetClassID(CLSID*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE IsDirty() override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE Save(LPCOLESTR, BOOL) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE SaveCompleted(LPCOLESTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetCurFile(LPOLESTR*) override { return E_NOTIMPL; }
-};
-inline HRESULT RecentCreation(REFCLSID clsid, LPUNKNOWN outer, DWORD context, REFIID iid, LPVOID* out) {
-    if (clsid != CLSID_ShellLink) return realComCreation(clsid, outer, context, iid, out);
-    *out = nullptr;
-    if (linkCreationFailure) return E_FAIL;
-    auto link = NewFake<RecentLink>();
-    return link->QueryInterface(iid, out);
-}
-inline void AddLink(unsigned index, LinkBehavior behavior, DWORD attributes = FILE_ATTRIBUTE_NORMAL) {
-    const auto name = L"fake" + std::to_wstring(index) + L".lnk";
-    WIN32_FIND_DATAW entry{};
-    std::copy(name.begin(), name.end(), entry.cFileName);
-    entry.dwFileAttributes = attributes;
-    entry.ftLastWriteTime = {index + 1, 0};
-    faults.entries.push_back(entry);
-    links[name] = std::move(behavior);
-}
-}
-
-void CheckRecentScannerPlatformFailures() {
-    fixture::Reset();
-    BackupFixture directory;
-    platform_failure::Scope isolated;
-    auto& f = platform_failure::faults;
-    fixture::recentDirectory = directory.directory;
-    fixture::creation = platform_failure::RecentCreation;
-    f.enumerate = true;
-    g_windowsRecentStopping = false;
-    Require(ScanWindowsRecentFolders().empty() && f.findCloseCalls == 0,
-            "missing shortcut enumeration returned entries or closed invalid find handle");
-    platform_failure::AddLink(0, {});
-    platform_failure::linkCreationFailure = true;
-    Require(ScanWindowsRecentFolders().empty() && platform_failure::linkLive == 0,
-            "failed shortcut COM creation produced folders");
-    platform_failure::linkCreationFailure = false;
-    platform_failure::persistInterface = false;
-    Require(ScanWindowsRecentFolders().empty() && platform_failure::linkLoads == 0 && platform_failure::linkLive == 0,
-            "shortcut without persist interface was loaded or leaked");
-    platform_failure::persistInterface = true;
-    for (unsigned stage = 0; stage < 5; ++stage) {
-        auto& behavior = platform_failure::links[L"fake0.lnk"];
-        behavior = {};
-        if (stage == 0) behavior.load = E_FAIL;
-        if (stage == 1) behavior.getPath = E_FAIL;
-        if (stage == 2) behavior.getPath = S_FALSE;
-        if (stage == 3) behavior.path.clear();
-        if (stage == 4) behavior.path = L"relative";
-        Require(ScanWindowsRecentFolders().empty() && platform_failure::linkLive == 0,
-                "invalid shortcut load/result/empty/relative target was accepted or leaked");
-    }
-    f.entries.clear();
-    platform_failure::links.clear();
-    platform_failure::AddLink(0, {L"C:\\skip-directory"}, FILE_ATTRIBUTE_DIRECTORY);
-    platform_failure::AddLink(1, {L"C:\\file", FILE_ATTRIBUTE_NORMAL});
-    platform_failure::AddLink(2, {L"C:\\good", FILE_ATTRIBUTE_DIRECTORY});
-    platform_failure::AddLink(3, {L"c:\\GOOD\\", FILE_ATTRIBUTE_DIRECTORY});
-    platform_failure::AddLink(4, {L"C:\\failed-load", FILE_ATTRIBUTE_DIRECTORY, E_FAIL});
-    platform_failure::AddLink(5, {directory.directory, 0});
-    platform_failure::AddLink(6, {directory.directory + L"\\absent", 0});
-    const auto scanned = ScanWindowsRecentFolders();
-    Require(scanned.size() == 2 && scanned[0].path == directory.directory &&
-            scanned[1].path == L"c:\\GOOD" && scanned[1].usedAt == 4 && platform_failure::linkLive == 0,
-            "shortcut failures stopped later valid entries, directory entries/files leaked, or duplicate/timestamp handling failed");
-    f.entries.clear();
-    platform_failure::links.clear();
-    platform_failure::linkLoads = 0;
-    for (unsigned i = 0; i < 4097; ++i) platform_failure::AddLink(i, {L"C:\\file", FILE_ATTRIBUTE_NORMAL});
-    const auto enumerated = f.findNextCalls;
-    Require(ScanWindowsRecentFolders().empty() && f.findNextCalls - enumerated == 4095 &&
-            platform_failure::linkLoads == kMaxRecentLinksScanned && platform_failure::linkLive == 0,
-            "scanner exceeded enumeration or shortcut-processing safety cap");
-    f.entries.clear();
-    platform_failure::links.clear();
-    platform_failure::linkLoads = 0;
-    for (unsigned i = 0; i < kMaxWindowsRecentFolders + 1; ++i) {
-        platform_failure::AddLink(i, {L"C:\\folder" + std::to_wstring(i), FILE_ATTRIBUTE_DIRECTORY});
-    }
-    Require(ScanWindowsRecentFolders().size() == kMaxWindowsRecentFolders &&
-            platform_failure::linkLoads == kMaxWindowsRecentFolders && platform_failure::linkLive == 0,
-            "scanner exceeded folder collection limit");
-    platform_failure::links.clear();
-    fixture::Reset();
-    std::puts("PASS: read-only Recent enumeration/COM/load/path failures, target filtering, cleanup and scanner caps");
-}
-
 void CheckPlatformFailures() {
     CheckBackupPlatformFailures();
     CheckEncodingAndKnownFolderFailures();
-    CheckWorkerPlatformFailures();
     CheckIconPlatformFailures();
-    CheckRecentScannerPlatformFailures();
 }
