@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.33
+// @version         0.8.34
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -83,8 +83,9 @@ the bar, newest on the right: 3 by default, up to 25.
 - Bookmarked and missing folders are skipped. In a narrow window the oldest
   buttons move into RC first.
 
-The mod remembers up to 64 folders opened in File Explorer in its local
-storage. Turning the feature off erases them.
+The mod remembers up to 64 folders opened in File Explorer, only in File
+Explorer's memory: the list starts empty after File Explorer restarts or the
+mod is updated. Turning the feature off erases it.
 
 ## If the bar doesn't appear
 
@@ -229,9 +230,11 @@ constexpr int kNavigationOverhang = 6;
 constexpr int kMeasuredHostHeightAt96Dpi = 136;
 constexpr size_t kFixedButtons = 2;
 constexpr float kDragThreshold = 6.0f;
-// Value names of versions before 0.8.32, shared by every account on the PC.
+// The bookmarks value name of versions before 0.8.32, shared by every
+// account on the PC.
 constexpr wchar_t kSharedBookmarksKey[] = L"folders";
-constexpr wchar_t kSharedRecentsKey[] = L"recentFolders";
+// Versions before 0.8.34 stored recent folders here; they now stay in memory.
+constexpr wchar_t kOldRecentsKey[] = L"recentFolders";
 // More entries than can be listed are kept, so filtering out bookmarks and
 // missing folders still leaves enough recent folders to show.
 constexpr size_t kMaxStoredRecents = 64;
@@ -308,7 +311,7 @@ bool UpdateThreadSettings() {
     return true;
 }
 
-void NotifyExplorerBars();
+void NotifyExplorerBars(bool thisProcessOnly = false);
 void ScheduleThreadWork();
 bool TrackFrame(HWND window);
 
@@ -652,11 +655,10 @@ FolderStatus CheckFolderStatus(const std::wstring& path) {
     return FolderStatus::Unknown;
 }
 
-// Windhawk keeps a mod's storage for the whole PC, so each account's lists
-// use value names that end with its SID. Set once in Wh_ModInit; without a
-// SID, the shared names of earlier versions stay in use.
+// Windhawk keeps a mod's storage for the whole PC, so each account's
+// bookmarks use a value name that ends with its SID. Set once in Wh_ModInit;
+// without a SID, the shared name of earlier versions stays in use.
 std::wstring g_bookmarksKey = kSharedBookmarksKey;
-std::wstring g_recentsKey = kSharedRecentsKey;
 
 std::wstring ReadValueLocked(const wchar_t* key) {
     std::vector<wchar_t> buffer(kMaxStorageChars + 1);
@@ -726,20 +728,6 @@ bool SaveBookmarksLocked(const std::vector<std::wstring>& folders) {
     return saved;
 }
 
-// Drops the oldest entries until the list fits in one storage value.
-bool SaveLinesLocked(const wchar_t* key, std::vector<std::wstring> lines) {
-    std::wstring storage = JoinLines(lines);
-    while (storage.size() > kMaxStorageChars && !lines.empty()) {
-        lines.pop_back();
-        storage = JoinLines(lines);
-    }
-    const bool saved = Wh_SetStringValue(key, storage.c_str());
-    if (saved) {
-        NotifyExplorerBars();
-    }
-    return saved;
-}
-
 // The SID of the account running this Explorer process, or empty.
 std::wstring CurrentUserSid() {
     HANDLE token = nullptr;
@@ -760,10 +748,10 @@ std::wstring CurrentUserSid() {
     return result;
 }
 
-// A shared list can't be attributed to one account, so the first account to
-// start Explorer with this version takes it and the shared value is removed.
-// A shared list found later was written by an older version after that, so
-// it is newer and replaces this account's list.
+// Shared bookmarks can't be attributed to one account, so the first account
+// to start Explorer with this version takes them and the shared value is
+// removed. Shared bookmarks found later were written by an older version
+// after that, so they are newer and replace this account's list.
 void ClaimSharedValueLocked(const wchar_t* shared, const std::wstring& own) {
     const auto value = ReadValueLocked(shared);
     if (value.empty()) {
@@ -778,19 +766,19 @@ void ClaimSharedValueLocked(const wchar_t* shared, const std::wstring& own) {
 }
 
 void InitUserStorage() try {
+    // Erase the history that earlier versions kept for every account.
+    Wh_DeleteValue(kOldRecentsKey);
     const auto sid = CurrentUserSid();
     if (sid.empty()) {
-        Wh_Log(L"Could not read the account SID; bookmarks and recent folders "
-               L"are shared by all accounts");
+        Wh_Log(L"Could not read the account SID; bookmarks are shared by all "
+               L"accounts");
         return;
     }
     g_bookmarksKey = std::wstring(kSharedBookmarksKey) + L"_" + sid;
-    g_recentsKey = std::wstring(kSharedRecentsKey) + L"_" + sid;
     std::lock_guard lock(g_storageMutex);
     ClaimSharedValueLocked(kSharedBookmarksKey, g_bookmarksKey);
-    ClaimSharedValueLocked(kSharedRecentsKey, g_recentsKey);
 } catch (...) {
-    Wh_Log(L"Could not move shared lists to this account: %08X",
+    Wh_Log(L"Could not move the shared bookmarks to this account: %08X",
            winrt::to_hresult().value);
 }
 
@@ -1426,60 +1414,68 @@ void LoadSettings() {
            recent.history, rcMode.data(), parents ? L"on" : L"off");
 }
 
-// Returns true when the stored order changed.
+// Recent folders stay in this Explorer process's memory, newest first. Each
+// account runs its own Explorer processes, so no other account sees them,
+// and nothing is written to the storage that all accounts share.
+std::mutex g_recentsMutex;
+std::vector<std::wstring> g_recents;
+
+// Returns true when the order changed.
 bool RecordExplorerRecent(std::wstring path) {
     path = NormalizePath(std::move(path));
     if (!IsAbsoluteFolderPath(path)) {
         return false;
     }
-    std::lock_guard lock(g_storageMutex);
-    auto recents = SplitPaths(ReadValueLocked(g_recentsKey.c_str()), kMaxStoredRecents);
-    if (!recents.empty() && SamePath(recents.front(), path)) {
-        return false;
+    {
+        std::lock_guard lock(g_recentsMutex);
+        if (!g_recents.empty() && SamePath(g_recents.front(), path)) {
+            return false;
+        }
+        std::erase_if(g_recents,
+                      [&](const auto& old) { return SamePath(old, path); });
+        g_recents.insert(g_recents.begin(), std::move(path));
+        if (g_recents.size() > kMaxStoredRecents) {
+            g_recents.resize(kMaxStoredRecents);
+        }
     }
-    std::erase_if(recents, [&](const auto& old) { return SamePath(old, path); });
-    recents.insert(recents.begin(), std::move(path));
-    if (recents.size() > kMaxStoredRecents) {
-        recents.resize(kMaxStoredRecents);
-    }
-    return SaveLinesLocked(g_recentsKey.c_str(), std::move(recents));
+    NotifyExplorerBars(true);
+    return true;
 }
 
 void RemoveRecent(const std::wstring& path) {
-    std::lock_guard lock(g_storageMutex);
-    auto recents = SplitPaths(ReadValueLocked(g_recentsKey.c_str()), kMaxStoredRecents);
-    size_t oldSize = recents.size();
-    std::erase_if(recents, [&](const auto& old) { return SamePath(old, path); });
-    if (recents.size() != oldSize) {
-        SaveLinesLocked(g_recentsKey.c_str(), std::move(recents));
+    {
+        std::lock_guard lock(g_recentsMutex);
+        if (!std::erase_if(g_recents, [&](const auto& old) {
+                return SamePath(old, path);
+            })) {
+            return;
+        }
     }
+    NotifyExplorerBars(true);
 }
 
 void ClearRecents() {
     {
-        std::lock_guard lock(g_storageMutex);
-        Wh_SetStringValue(g_recentsKey.c_str(), L"");
+        std::lock_guard lock(g_recentsMutex);
+        g_recents.clear();
     }
-    NotifyExplorerBars();
+    NotifyExplorerBars(true);
 }
 
 // Nothing is recorded while recent folders are off, and the remembered list
 // is erased, so turning the feature off also clears its history.
-void EraseRecentsWhileOff() try {
+void EraseRecentsWhileOff() {
     {
         std::lock_guard lock(g_settingsMutex);
         if (g_sharedRecentSettings.enabled) {
             return;
         }
     }
-    std::lock_guard lock(g_storageMutex);
-    if (!ReadValueLocked(g_recentsKey.c_str()).empty()) {
-        Wh_SetStringValue(g_recentsKey.c_str(), L"");
+    std::lock_guard lock(g_recentsMutex);
+    if (!g_recents.empty()) {
+        g_recents.clear();
         Wh_Log(L"Recent folders are off: remembered folders erased");
     }
-} catch (...) {
-    Wh_Log(L"Could not erase remembered folders: %08X",
-           winrt::to_hresult().value);
 }
 
 struct RecentView {
@@ -1493,8 +1489,8 @@ RecentView LoadRecentView(const std::vector<std::wstring>& bookmarks) {
     RecentView view;
     std::vector<std::wstring> candidates;
     {
-        std::lock_guard lock(g_storageMutex);
-        candidates = SplitPaths(ReadValueLocked(g_recentsKey.c_str()), kMaxStoredRecents);
+        std::lock_guard lock(g_recentsMutex);
+        candidates = g_recents;
     }
     for (auto& path : candidates) {
         if (view.folders.size() >= g_recentSettings.history) {
@@ -3669,18 +3665,23 @@ UINT RefreshBarsMessage() {
     return message;
 }
 
-void NotifyExplorerBars() {
+void NotifyExplorerBars(bool thisProcessOnly) {
     if (g_unloading) {
         return;
     }
     // Marked windows can belong to another Explorer process using this mod.
     // Messages contain no pointers; each window reads shared storage itself.
-    EnumWindows([](HWND window, LPARAM) -> BOOL {
-        if (GetPropW(window, kFrameProperty)) {
+    // Recent folders are in this process's memory, so only its windows need
+    // to redraw them.
+    EnumWindows([](HWND window, LPARAM thisProcess) -> BOOL {
+        DWORD process = 0;
+        if (GetPropW(window, kFrameProperty) &&
+            (!thisProcess || (GetWindowThreadProcessId(window, &process) &&
+                              process == GetCurrentProcessId()))) {
             PostMessageW(window, RefreshBarsMessage(), 0, 0);
         }
         return TRUE;
-    }, 0);
+    }, thisProcessOnly);
 }
 
 bool FileListFocused() {
@@ -4819,7 +4820,6 @@ BOOL Wh_ModInit() {
         return FALSE;
     }
     InitUserStorage();
-    EraseRecentsWhileOff();
     HMODULE kernelBase = GetModuleHandleW(L"kernelbase.dll");
     auto loadLibraryExW = kernelBase
                               ? reinterpret_cast<LoadLibraryExW_t>(

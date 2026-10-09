@@ -16,16 +16,18 @@ Development source in `mods/`, tested in File Explorer.
 - **Recent folders** (off by default): buttons at the right end of the bar
   (3 by default, up to 25) and an **RC** menu with the other folders you
   opened in File Explorer, 10 in total by default and up to 25.
-  Middle-click removes one; drag it onto the bookmarks to keep it. Turning
-  the feature off erases the list.
+  Middle-click removes one; drag it onto the bookmarks to keep it. The
+  list stays in File Explorer's memory only: it starts empty after File
+  Explorer restarts or the mod is updated, and turning the feature off
+  erases it.
 - Buttons with the same folder name can also show their parent folder
   (off by default).
 
 ### Changed
 
-- Bookmarks and recent folders are kept separately for each Windows
-  account. After the update, the shared list moves to the first account
-  that opens File Explorer.
+- Bookmarks are kept separately for each Windows account. After the
+  update, the shared list moves to the first account that opens File
+  Explorer.
 - Disabling or recompiling the mod while dropped folders are still being
   read cancels that read and waits for it to finish.
 - Opening a missing bookmark in a new tab or window does nothing, like a

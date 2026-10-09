@@ -250,7 +250,7 @@ void CheckRecentPointerPromotionAndMouseRecovery() {
     args->point->properties->left = false;
     args->point->properties->middle = true;
     pointer_fixture::Press(recentButton, args);
-    Require(args->handled && SplitPaths(ReadValueLocked(g_recentsKey.c_str()), kMaxStoredRecents) ==
+    Require(args->handled && g_recents ==
             std::vector<std::wstring>{recent} && bar.state->recentFolders.empty(),
             "middle press did not remove recent history and visual");
     auto button = BarButtons(bar.panel)[2];

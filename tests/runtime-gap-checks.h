@@ -204,22 +204,22 @@ void CheckNavigationEventAndTrackerGaps() {
     DISPPARAMS parameters{arguments, nullptr, 2, 0};
     arguments[1].vt = VT_I4;
     OnShellEvent(kDispidDocumentComplete, &parameters);
-    Require(!g_refreshPending && fixture::writes == 0,
-            "navigation with a nondispatch first argument wrote history");
+    Require(!g_refreshPending && g_recents.empty(),
+            "navigation with a nondispatch first argument recorded history");
     arguments[1].vt = VT_DISPATCH;
     arguments[1].pdispVal = nullptr;
     OnShellEvent(kDispidNavigateComplete2, &parameters);
-    Require(!g_refreshPending && fixture::writes == 0,
-            "navigation with null dispatch wrote history");
+    Require(!g_refreshPending && g_recents.empty(),
+            "navigation with null dispatch recorded history");
     arguments[1].pdispVal = shell.web.get();
     OnShellEvent(kDispidNavigateComplete2, &parameters);
     Require(g_refreshPending && !g_recentSyncPending && g_workTimer &&
-            fixture::storage[g_recentsKey] == scratch.directory,
+            g_recents == std::vector<std::wstring>{scratch.directory},
             "valid navigation event lost deferred refresh or recorded wrong argument");
     StopThreadWork();
-    const auto writes = fixture::writes;
+    const auto recorded = g_recents;
     OnShellEvent(kDispidDocumentComplete, &parameters);
-    Require(!g_refreshPending && fixture::writes == writes,
+    Require(!g_refreshPending && g_recents == recorded,
             "duplicate completion event rewrote history or requested a refresh");
     OnShellEvent(-4567, &parameters);
     Require(!g_workTimer, "unrelated Shell event requested work");
@@ -229,14 +229,14 @@ void CheckNavigationEventAndTrackerGaps() {
     StopThreadWork();
     g_recentSettings.enabled = false;
     OnShellEvent(kDispidDocumentComplete, &parameters);
-    Require(!g_workTimer && fixture::writes == writes,
+    Require(!g_workTimer && g_recents == recorded,
             "disabled recents consumed navigation event");
     g_recentSettings.enabled = true;
     {
         allocation_fixture::Scope allocation(32768 * sizeof(wchar_t));
         OnShellEvent(kDispidDocumentComplete, &parameters);
         Require(allocation.Triggered() && !g_refreshPending && !g_workTimer &&
-                fixture::writes == writes,
+                g_recents == recorded,
                 "navigation path-allocation failure escaped the event guard or changed history");
     }
     auto noContainer = NewFake<runtime_gap::Web>();

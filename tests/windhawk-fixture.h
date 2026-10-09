@@ -49,6 +49,8 @@ inline bool symbolSuccess = false;
 inline unsigned symbolCalls = 0;
 inline unsigned hookApplications = 0;
 inline std::map<std::wstring, HMODULE> modules;
+// Clears mod state that lives outside storage, such as the in-memory recents.
+inline void (*resetHook)() = nullptr;
 inline void Reset() {
     storage.clear();
     strings.clear();
@@ -70,6 +72,7 @@ inline void Reset() {
     symbolCalls = 0;
     hookApplications = 0;
     modules.clear();
+    if (resetHook) resetHook();
 }
 }
 

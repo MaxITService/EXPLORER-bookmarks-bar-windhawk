@@ -61,10 +61,6 @@ void CheckBookmarkStorageEdges() {
     fixture::failWrites = true;
     Require(!MoveBookmarkToIndex(full.back(), 0) && fixture::storage == beforeFull,
             "failed reorder mutated persisted bookmarks");
-    const auto failedWrites = fixture::writes;
-    Require(!SaveLinesLocked(L"history", {L"C:\\recent"}) &&
-            fixture::writes == failedWrites + 1 && !fixture::storage.contains(L"history"),
-            "failed history save created a persisted value");
     fixture::failWrites = false;
     Require(NoticeText(MakeNotice(nullptr, BookmarkChange{})).empty() &&
             NoticeText(MakeNotice(nullptr, BookmarkChange{false, 0, 1})) ==
@@ -123,21 +119,14 @@ void CheckBackupSchemaAndSizeEdges() {
 
 void CheckRecentStorageAndViewEdges() {
     fixture::Reset();
-    fixture::storage[g_recentsKey] = L"\\\\s\\one\n\\\\s\\two";
-    const auto before = fixture::storage;
-    const auto writes = fixture::writes;
+    g_recents = SplitPaths(L"\\\\s\\one\n\\\\s\\two", kMaxStoredRecents);
+    const auto before = g_recents;
     RemoveRecent(L"\\\\s\\absent");
-    Require(fixture::storage == before && fixture::writes == writes,
-            "absent recent removal wrote storage");
-    fixture::failWrites = true;
-    RemoveRecent(L"\\\\s\\one");
-    Require(!RecordExplorerRecent(L"\\\\s\\failed") && fixture::storage == before,
-            "failed recent write mutated persisted history");
-    fixture::failWrites = false;
+    Require(g_recents == before, "absent recent removal changed history");
 
     const auto previousSettings = g_recentSettings;
-    fixture::storage[g_recentsKey] =
-        L"C:\\missing\n\\\\s\\one\n\\\\S\\ONE\n\\\\s\\two\n\\\\s\\three";
+    g_recents = SplitPaths(
+        L"C:\\missing\n\\\\s\\one\n\\\\S\\ONE\n\\\\s\\two\n\\\\s\\three", kMaxStoredRecents);
     fixture::drives[L"C:\\"] = DRIVE_FIXED;
     fixture::attributes[L"C:\\missing"] = {INVALID_FILE_ATTRIBUTES, ERROR_PATH_NOT_FOUND};
     g_recentSettings.history = 10;
@@ -149,7 +138,7 @@ void CheckRecentStorageAndViewEdges() {
 
     g_recentSettings = previousSettings;
     fixture::Reset();
-    std::puts("PASS: failed recent writes and recent view filter edges");
+    std::puts("PASS: absent recent removal and recent view filter edges");
 }
 
 void CheckSettingsSnapshotEdges() {

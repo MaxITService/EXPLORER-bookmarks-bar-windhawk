@@ -565,7 +565,7 @@ void CheckXamlMenuActionsAndNotices() {
     auto clearMenu = rc.ContextFlyout().as<muxc::MenuFlyout>();
     auto clear = clearMenu.Items().GetAt(0).as<muxc::MenuFlyoutItem>();
     InvokeControl<muxc::MenuFlyoutItem, mux::Automation::Peers::MenuFlyoutItemAutomationPeer>(clear);
-    Require(fixture::storage[g_recentsKey].empty(), "RC clear menu did not clear recent storage");
+    Require(g_recents.empty(), "RC clear menu did not clear recent storage");
     fakeDialog->showResult = HRESULT_FROM_WIN32(ERROR_CANCELLED);
     const auto shown = fakeDialog->shows;
     auto currentSave = BarButtons(fixture.panel)[0].ContextFlyout().as<muxc::MenuFlyout>()

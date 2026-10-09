@@ -328,11 +328,6 @@ void CheckStoredMutations() {
     fixture::failWrites = false;
     Require(!SaveBookmarksLocked({std::wstring(kMaxStorageChars + 1, L'x')}),
             "oversized bookmarks saved");
-    Require(SaveLinesLocked(L"test", {std::wstring(kMaxStorageChars, L'x'), L"older"}) &&
-            fixture::storage[L"test"].size() == kMaxStorageChars,
-            "oldest history did not trim to storage limit");
-    Require(SaveLinesLocked(L"test", {std::wstring(kMaxStorageChars + 1, L'x')}) &&
-            fixture::storage[L"test"].empty(), "oversized single history item not dropped");
     fixture::storage[g_bookmarksKey] = std::wstring(kMaxStorageChars + 1, L'x');
     Require(ReadStorageLocked().empty(), "oversized read accepted");
     fixture::Reset();
@@ -390,28 +385,29 @@ void CheckSettingsAndRecents() {
         Require(RecordExplorerRecent(L"\\\\test.invalid\\share\\" + std::to_wstring(i)),
                 "recent folder not recorded");
     }
-    auto recent = SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents + 2);
+    Require(fixture::storage.empty() && fixture::writes == 0,
+            "recent folders were written to the storage all accounts share");
+    auto recent = g_recents;
     Require(recent.size() == kMaxStoredRecents &&
             !RecordExplorerRecent(recent.front()) && RecordExplorerRecent(recent.back()),
             "recent cap, same-front no-op or promotion failed");
-    recent = SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents);
+    recent = g_recents;
     g_recentSettings.history = 2;
     const auto view = LoadRecentView({recent.front()});
     Require(view.folders.size() == 2 &&
             view.folders[0] == recent[1], "recent view did not filter bookmarks or apply history limit");
     RemoveRecent(recent.front());
-    Require(SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents).size() == kMaxStoredRecents - 1,
-            "recent removal failed");
+    Require(g_recents.size() == kMaxStoredRecents - 1, "recent removal failed");
     ClearRecents();
-    Require(fixture::storage[g_recentsKey].empty(), "explorer history not cleared");
-    fixture::storage[g_recentsKey] = L"C:\\kept";
+    Require(g_recents.empty(), "explorer history not cleared");
+    g_recents = {L"C:\\kept"};
     fixture::integers[L"recent.enabled"] = 1;
     LoadSettings();
     EraseRecentsWhileOff();
-    Require(fixture::storage[g_recentsKey] == L"C:\\kept", "enabled recent folders were erased");
+    Require(g_recents == std::vector<std::wstring>{L"C:\\kept"}, "enabled recent folders were erased");
     fixture::integers[L"recent.enabled"] = 0;
     Wh_ModSettingsChanged();
-    Require(fixture::storage[g_recentsKey].empty(), "turning recent folders off kept their history");
+    Require(g_recents.empty(), "turning recent folders off kept their history");
     fixture::integers[L"recent.enabled"] = 1;
     LoadSettings(); // Later groups expect the published settings with recents on.
     fixture::Reset();
@@ -423,29 +419,22 @@ void CheckPerUserStorage() {
     const auto sid = CurrentUserSid();
     Require(sid.starts_with(L"S-1-"), "account SID unavailable");
     const std::wstring sharedBookmarks = kSharedBookmarksKey;
-    const std::wstring sharedRecents = kSharedRecentsKey;
     fixture::storage[sharedBookmarks] = L"C:\\shared";
-    fixture::storage[sharedRecents] = L"C:\\recent";
+    fixture::storage[kOldRecentsKey] = L"C:\\recent";
     InitUserStorage();
-    Require(g_bookmarksKey == sharedBookmarks + L"_" + sid &&
-            g_recentsKey == sharedRecents + L"_" + sid,
-            "storage value names do not end with the account SID");
+    Require(g_bookmarksKey == sharedBookmarks + L"_" + sid,
+            "bookmarks value name does not end with the account SID");
     Require(fixture::storage[g_bookmarksKey] == L"C:\\shared" &&
-            fixture::storage[g_recentsKey] == L"C:\\recent" &&
             !fixture::storage.contains(sharedBookmarks) &&
-            !fixture::storage.contains(sharedRecents),
-            "shared lists did not move to the account");
-    Require(AddBookmark(L"C:\\own").changed && RecordExplorerRecent(L"C:\\opened") &&
-            ReadStorageLocked() == L"C:\\shared\nC:\\own" &&
-            !fixture::storage.contains(sharedBookmarks) &&
-            !fixture::storage.contains(sharedRecents),
-            "account edits wrote the shared values");
+            !fixture::storage.contains(kOldRecentsKey),
+            "shared bookmarks did not move to the account or stored history was kept");
+    Require(AddBookmark(L"C:\\own").changed && ReadStorageLocked() == L"C:\\shared\nC:\\own" &&
+            !fixture::storage.contains(sharedBookmarks),
+            "account edits wrote the shared value");
     fixture::storage[sharedBookmarks + L"_S-1-5-21-1-2-3-1001"] = L"C:\\other";
-    fixture::storage[sharedRecents + L"_S-1-5-21-1-2-3-1001"] = L"C:\\other";
     InitUserStorage();
-    Require(ReadStorageLocked() == L"C:\\shared\nC:\\own" &&
-            fixture::storage[g_recentsKey] == L"C:\\opened\nC:\\recent",
-            "another account's lists were read or a restart changed this account's lists");
+    Require(ReadStorageLocked() == L"C:\\shared\nC:\\own",
+            "another account's bookmarks were read or a restart changed this account's list");
     // An older version wrote the shared list after the move: it is newer.
     fixture::storage[sharedBookmarks] = L"D:\\newer";
     InitUserStorage();
@@ -458,7 +447,7 @@ void CheckPerUserStorage() {
     Require(fixture::storage[sharedBookmarks] == L"E:\\kept" && ReadStorageLocked() == L"D:\\newer",
             "a failed move lost the shared list or changed the account's list");
     fixture::Reset();
-    std::puts("PASS: per-account value names, one-time move of shared lists and failed-move retention");
+    std::puts("PASS: per-account bookmarks, one-time move of shared bookmarks, failed-move retention and erased stored history");
 }
 
 void CheckFolderLabels() {
@@ -757,6 +746,7 @@ int main(int argc, char** argv) {
             "could not disable interactive crash reporting for the test process");
     ComScope com;
     Require(SUCCEEDED(com.result), "test COM initialization failed");
+    fixture::resetHook = [] { g_recents.clear(); };
     if (argc == 2 && std::string_view(argv[1]) == "--xaml") {
         try { CheckXamlRuntime(); }
         catch (const winrt::hresult_error& error) {
