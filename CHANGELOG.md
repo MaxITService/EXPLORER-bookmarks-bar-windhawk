@@ -28,6 +28,8 @@ Development source in `mods/`, tested in File Explorer.
   that opens File Explorer.
 - Disabling or recompiling the mod while dropped folders are still being
   read cancels that read and waits for it to finish.
+- Opening a missing bookmark in a new tab or window does nothing, like a
+  plain click, instead of showing Windows' error box.
 - Saved settings apply to open windows; no new window needed.
 - Bookmark and recent-folder changes show in all open windows right away.
 - Hovering a bookmark updates its icon and missing-folder mark without
@@ -46,6 +48,8 @@ Development source in `mods/`, tested in File Explorer.
 - A backup whose path contains a hidden NUL character is rejected instead
   of loading a shortened path.
 - Errors in the bar's click, menu and drag handlers are caught and logged.
+- Disabling or updating the mod while a bar click is still being handled
+  waits for that click to finish instead of risking an Explorer crash.
 
 ## 0.7.8 (2026-09-29)
 

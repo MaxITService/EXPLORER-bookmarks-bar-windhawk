@@ -22,8 +22,10 @@ void CheckObservedFolderActionsAndWeakGuards() {
     g_unloading = true;
     click(button, nullptr);
     context(button, contextArgs->Event());
-    Require(contextArgs->handled && shell.browser->navigated.empty() && fixture::launches.empty(),
-            "unloading folder delegates performed navigation");
+    // A delegate that fires after unloading began does nothing at all: the
+    // bar is about to be removed, and unloading must not wait for it.
+    Require(!contextArgs->handled && shell.browser->navigated.empty() && fixture::launches.empty() &&
+            !g_activeOperations, "unloading folder delegates ran");
     g_unloading = false;
     click(button, nullptr);
     Require(shell.browser->navigated == std::vector<std::wstring>{scratch.directory},

@@ -39,6 +39,7 @@ inline ComCreation creation = nullptr;
 inline std::map<int, SHORT> keys;
 inline std::vector<std::pair<std::wstring, std::wstring>> launches;
 inline INT_PTR launchResult = 33;
+inline ULONG launchMask = 0;
 inline std::map<std::wstring, UINT> drives;
 inline std::map<std::wstring, std::pair<DWORD, DWORD>> attributes;
 inline HWND activeWindow = nullptr;
@@ -59,6 +60,7 @@ inline void Reset() {
     keys.clear();
     launches.clear();
     launchResult = 33;
+    launchMask = 0;
     drives.clear();
     attributes.clear();
     activeWindow = nullptr;
@@ -144,10 +146,13 @@ inline HRESULT WINAPI FixtureCoCreateInstance(REFCLSID clsid, LPUNKNOWN outer,
     if (fixture::creation) return fixture::creation(clsid, outer, context, iid, output);
     return CoCreateInstance(clsid, outer, context, iid, output);
 }
-inline HINSTANCE WINAPI FixtureShellExecuteW(HWND, LPCWSTR operation, LPCWSTR file,
-                                             LPCWSTR, LPCWSTR, INT) {
-    fixture::launches.emplace_back(operation ? operation : L"", file ? file : L"");
-    return reinterpret_cast<HINSTANCE>(fixture::launchResult);
+inline BOOL WINAPI FixtureShellExecuteExW(SHELLEXECUTEINFOW* info) {
+    fixture::launches.emplace_back(info->lpVerb ? info->lpVerb : L"",
+                                   info->lpFile ? info->lpFile : L"");
+    fixture::launchMask = info->fMask;
+    if (fixture::launchResult > 32) return TRUE;
+    SetLastError(static_cast<DWORD>(fixture::launchResult));
+    return FALSE;
 }
 inline SHORT WINAPI FixtureGetKeyState(int key) { return fixture::keys[key]; }
 inline SHORT WINAPI FixtureGetAsyncKeyState(int key) { return fixture::keys[key]; }
@@ -162,7 +167,7 @@ inline DWORD WINAPI FixtureGetFileAttributesW(LPCWSTR path) {
     return found->second.first;
 }
 #define CoCreateInstance FixtureCoCreateInstance
-#define ShellExecuteW FixtureShellExecuteW
+#define ShellExecuteExW FixtureShellExecuteExW
 #define GetKeyState FixtureGetKeyState
 #define GetAsyncKeyState FixtureGetAsyncKeyState
 #define GetDriveTypeW FixtureGetDriveTypeW

@@ -589,11 +589,17 @@ void CheckCallbacksAndDeferredWork() {
     auto guarded = GuardHandler(L"test", [&](unsigned amount) {
         called += amount;
         Require(g_uiCallbackDepth > 0, "guard did not enter callback scope");
+        Require(g_activeOperations == 1, "guarded handler was not an operation unloading waits for");
         throw winrt::hresult_error(E_FAIL);
     });
     guarded(2);
     Require(called == 2 && g_uiCallbackDepth == 0, "guard leaked depth or failed to invoke handler");
     Require(g_activeOperations == 0, "operation state contaminated before test");
+    g_unloading = true;
+    guarded(5);
+    g_unloading = false;
+    Require(called == 2 && g_activeOperations == 0 && g_uiCallbackDepth == 0,
+            "guarded handler ran after unloading began");
     {
         OperationScope outer;
         OperationScope inner;

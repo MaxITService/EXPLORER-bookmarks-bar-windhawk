@@ -401,6 +401,9 @@ void CheckXamlCommandBarInstallation() {
     CleanupCurrentThread();
     Require(!g_bars && !g_messageHook && !g_workTimer,
             "repeated thread cleanup retained XAML state or hook");
+    Require(g_iconCache.capacity() == 0 && g_fxFolders.capacity() == 0 &&
+            g_threadSettingsGeneration == 0,
+            "thread cleanup kept icon or settings allocations");
     g_bars.emplace();
     g_frameHooked = false;
     fixture::Reset();

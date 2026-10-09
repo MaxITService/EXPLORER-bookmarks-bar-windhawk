@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.32
+// @version         0.8.33
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -184,6 +184,7 @@ and check the Windhawk log.
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -469,6 +470,30 @@ struct UiCallbackScope {
     }
 };
 
+// Event handlers, file dialogs and recent-folder tracking can run a nested
+// message loop on an Explorer thread: COM calls to Explorer's shell, dialogs.
+// The cleanup that unloading sends to each thread can be dispatched inside
+// such a loop, so unloading waits until no operation is on any stack, and no
+// new one starts once it has begun.
+struct OperationScope {
+    UiCallbackScope uiScope;
+    bool active = false;
+    OperationScope() {
+        std::lock_guard lock(g_operationMutex);
+        if (!g_unloading) {
+            ++g_activeOperations;
+            active = true;
+        }
+    }
+    ~OperationScope() {
+        if (active) {
+            std::lock_guard lock(g_operationMutex);
+            --g_activeOperations;
+            g_operationFinished.notify_all();
+        }
+    }
+};
+
 void RevokeHandlers(std::vector<std::function<void()>>& handlers) {
     auto pending = std::move(handlers);
     handlers.clear();
@@ -483,11 +508,16 @@ void RevokeHandlers(std::vector<std::function<void()>>& handlers) {
 }
 
 // An exception must not leave a XAML delegate: XAML would see a failed
-// HRESULT from an event handler. Log it and let the bar keep working.
+// HRESULT from an event handler. Log it and let the bar keep working. Each
+// handler is an operation, so unloading waits for it, and a handler that
+// fires after unloading began does nothing.
 template <typename Handler>
 auto GuardHandler(const wchar_t* name, Handler handler) {
     return [name, handler = std::move(handler)](auto&&... args) {
-        UiCallbackScope uiScope;
+        OperationScope operation;
+        if (!operation.active) {
+            return;
+        }
         try {
             handler(std::forward<decltype(args)>(args)...);
         } catch (...) {
@@ -566,6 +596,16 @@ struct IconCacheEntry {
 // WriteableBitmap is a XAML object, so never share these entries across UI
 // threads. Eviction also bounds memory when bookmarks are repeatedly changed.
 thread_local std::vector<IconCacheEntry> g_iconCache;
+
+// Thread-local destructors don't run on Explorer threads that outlive the
+// mod, so free this thread's icons and settings copy when its bars go away.
+// A later window on the thread copies the settings again.
+void ReleaseThreadCaches() {
+    // Assigning {} would keep the capacity; swapping frees the buffers.
+    std::vector<IconCacheEntry>().swap(g_iconCache);
+    std::vector<FxFolder>().swap(g_fxFolders);
+    g_threadSettingsGeneration = 0;
+}
 
 std::wstring NormalizePath(std::wstring path) {
     while (path.size() > 3 && (path.back() == L'\\' || path.back() == L'/')) {
@@ -1471,27 +1511,6 @@ RecentView LoadRecentView(const std::vector<std::wstring>& bookmarks) {
     return view;
 }
 
-// File dialogs and recent-folder tracking can run a nested message loop on an
-// Explorer thread; unloading waits until no such operation is on any stack.
-struct OperationScope {
-    UiCallbackScope uiScope;
-    bool active = false;
-    OperationScope() {
-        std::lock_guard lock(g_operationMutex);
-        if (!g_unloading) {
-            ++g_activeOperations;
-            active = true;
-        }
-    }
-    ~OperationScope() {
-        if (active) {
-            std::lock_guard lock(g_operationMutex);
-            --g_activeOperations;
-            g_operationFinished.notify_all();
-        }
-    }
-};
-
 std::wstring ChooseBackupPath(HWND owner, bool save,
                               const std::wstring& suggestedPath) {
     ComScope com;
@@ -1848,29 +1867,36 @@ void NavigateToFolder(HWND explorerWindow, const std::wstring& path) {
     }
 }
 
+// Without SEE_MASK_FLAG_NO_UI, Windows shows its own error box for a missing
+// or unreachable folder. That box runs a modal loop inside the click handler,
+// and unloading would wait until the user closes it. A failure is logged,
+// as for a plain click.
+bool LaunchFolderVerb(HWND owner, const wchar_t* verb, const std::wstring& path) {
+    SHELLEXECUTEINFOW info{};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_FLAG_NO_UI | SEE_MASK_NOASYNC;
+    info.hwnd = owner;
+    info.lpVerb = verb;
+    info.lpFile = path.c_str();
+    info.nShow = SW_SHOWNORMAL;
+    if (ShellExecuteExW(&info)) {
+        return true;
+    }
+    Wh_Log(L"Bookmark %ls failed: %u", verb, GetLastError());
+    return false;
+}
+
 void OpenFolderInNewTab(HWND explorerWindow, const std::wstring& path) {
     // Windows 11 registers this Folder shell verb for Explorer tabs. Explorer
     // chooses which window receives the tab; HWND is the owner for the request.
-    HINSTANCE result = ShellExecuteW(explorerWindow, L"opennewtab",
-                                     path.c_str(), nullptr, nullptr,
-                                     SW_SHOWNORMAL);
-    if (reinterpret_cast<INT_PTR>(result) <= 32) {
-        Wh_Log(L"Bookmark new-tab navigation failed: %d",
-               static_cast<int>(reinterpret_cast<INT_PTR>(result)));
-    } else {
+    if (LaunchFolderVerb(explorerWindow, L"opennewtab", path)) {
         Wh_Log(L"Bookmark opened in a new tab: %ls", path.c_str());
     }
 }
 
 void OpenFolderInNewWindow(HWND explorerWindow, const std::wstring& path) {
     // The Folder verb behind Explorer's "Open in new window" command.
-    HINSTANCE result = ShellExecuteW(explorerWindow, L"opennewwindow",
-                                     path.c_str(), nullptr, nullptr,
-                                     SW_SHOWNORMAL);
-    if (reinterpret_cast<INT_PTR>(result) <= 32) {
-        Wh_Log(L"Bookmark new-window navigation failed: %d",
-               static_cast<int>(reinterpret_cast<INT_PTR>(result)));
-    } else {
+    if (LaunchFolderVerb(explorerWindow, L"opennewwindow", path)) {
         Wh_Log(L"Bookmark opened in a new window: %ls", path.c_str());
     }
 }
@@ -4132,7 +4158,7 @@ void CleanupClosedFrameState(HWND window) {
         StopThreadWork();
         StopRecentTracking();
         RemoveMessageHook();
-        g_iconCache.clear();
+        ReleaseThreadCaches();
         g_frameRows = 0;
     } else {
         ScheduleRecentWork(true, false);
@@ -4704,7 +4730,7 @@ void CleanupCurrentThread() {
     // The hooks, timers, listeners and handlers are gone and g_unloading is
     // set, so nothing on this thread reads g_bars after this.
     g_bars.reset();
-    g_iconCache.clear();
+    ReleaseThreadCaches();
     if (hadBars) {
         // The size hook is inactive now, so Explorer returns to its stock
         // header height instead of leaving an empty band until a resize.

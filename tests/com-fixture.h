@@ -339,6 +339,8 @@ void CheckShellSelectionAndNavigation() {
     OpenFolderInNewWindow(shell.frame, L"C:\\folder");
     Require(fixture::launches.size() == 4 && fixture::launches[0].first == L"opennewtab" &&
             fixture::launches[1].first == L"opennewwindow", "navigation used wrong Shell verbs");
+    Require((fixture::launchMask & SEE_MASK_FLAG_NO_UI) && (fixture::launchMask & SEE_MASK_NOASYNC),
+            "new tab or window launch can show Windows' modal error box");
     Require(!RecordNavigation(nullptr, 0) && RecordNavigation(shell.web.get(), kDispidDocumentComplete) &&
             !RecordNavigation(shell.web.get(), kDispidDocumentComplete),
             "navigation event recording lost path or duplicate suppression");
