@@ -138,7 +138,7 @@ void CheckExternalDropCompletionAndFailures() {
     failedRegistration.args->accepted = wdt::DataPackageOperation::Link;
     failedRegistration.read->failRegistration = true;
     OnBarDrop(bar.panel, failedRegistration.Event());
-    Require(g_pendingDrops == 0 && failedRegistration.read->registrations == 1 &&
+    Require(g_pendingDrops == 0 && g_dropReads.empty() && failedRegistration.read->registrations == 1 &&
             !failedRegistration.read->completion && ReadStorageLocked() == stable,
             "completion-registration failure leaked pending count");
     drop_fixture::Request failedResults(bar.strip);
@@ -188,11 +188,13 @@ void CheckExternalDropCompletionAndFailures() {
     second.read->SetItems({drop_fixture::Folder(d)});
     OnBarDrop(bar.panel, first.Event());
     OnBarDrop(bar.panel, second.Event());
-    Require(g_pendingDrops == 2, "independent drops did not track two pending reads");
+    Require(g_pendingDrops == 2 && g_dropReads.size() == 2,
+            "independent drops did not track two pending reads");
     second.read->Finish();
     Require(g_pendingDrops == 1, "first of two completions lost remaining pending read");
     first.read->Finish();
-    Require(g_pendingDrops == 0 && SplitBookmarks(ReadStorageLocked()) == std::vector<std::wstring>{c, d, a, b},
+    Require(g_pendingDrops == 0 && g_dropReads.empty() &&
+            SplitBookmarks(ReadStorageLocked()) == std::vector<std::wstring>{c, d, a, b},
             "out-of-order completion overwrote another drop or leaked its count");
     std::puts("PASS: asynchronous drop insertion, delayed/synchronous/out-of-order reads, cancel/error/exception and unload cleanup");
 }

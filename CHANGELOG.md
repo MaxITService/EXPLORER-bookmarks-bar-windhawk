@@ -22,6 +22,8 @@ Development source in `mods/`, not yet tested in File Explorer.
 
 ### Changed
 
+- Disabling or recompiling the mod while dropped folders are still being
+  read cancels that read and waits for it to finish.
 - Saved settings apply to open windows; no new window needed.
 - Bookmark and recent-folder changes show in all open windows right away.
 - Hovering a bookmark updates its icon and missing-folder mark without

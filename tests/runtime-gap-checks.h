@@ -3,6 +3,20 @@
 // Windhawk data and isolated TEMP files. No Explorer hooks or navigation.
 
 namespace runtime_gap {
+// A dropped-item read that finishes only on its third cancellation.
+struct StubbornRead : winrt::implements<StubbornRead, winrt::Windows::Foundation::IAsyncInfo> {
+    unsigned cancels = 0;
+    uint32_t Id() { return 2; }
+    winrt::Windows::Foundation::AsyncStatus Status() {
+        return cancels >= 3 ? winrt::Windows::Foundation::AsyncStatus::Canceled
+                            : winrt::Windows::Foundation::AsyncStatus::Started;
+    }
+    winrt::hresult ErrorCode() { return S_OK; }
+    void Cancel() {
+        if (++cancels == 3) --g_pendingDrops;
+    }
+    void Close() {}
+};
 bool SameRecentSettings(const RecentSettings& a, const RecentSettings& b) {
     return a.enabled == b.enabled && a.buttons == b.buttons &&
            a.menuButton == b.menuButton && a.history == b.history &&
@@ -563,19 +577,21 @@ void CheckUninitPendingOperationAndDropGaps() {
     Require(pendingAtReturn == 0 && !g_pendingDrops && returnedAfter >= 100,
             "uninit failed to wait for asynchronous item-read completion");
     g_unloading = false;
+    auto stubborn = winrt::make_self<runtime_gap::StubbornRead>();
+    g_dropReads = {stubborn.as<winrt::Windows::Foundation::IAsyncInfo>()};
     g_pendingDrops = 1;
-    HANDLE stalledFinished = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    Require(stalledFinished, "stalled-read completion gate failed");
-    std::thread stalledUnloading([&] { Wh_ModUninit(); SetEvent(stalledFinished); });
-    Require(WaitForSingleObject(stalledFinished, 10000) == WAIT_OBJECT_0,
-            "uninit failed to bound the drain of a stalled asynchronous read");
-    stalledUnloading.join();
-    CloseHandle(stalledFinished);
-    Require(g_pendingDrops == 1, "uninit fabricated completion for a stalled asynchronous read");
-    g_pendingDrops = 0;
+    HANDLE stubbornFinished = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    Require(stubbornFinished, "stubborn-read completion gate failed");
+    std::thread stubbornUnloading([&] { Wh_ModUninit(); SetEvent(stubbornFinished); });
+    Require(WaitForSingleObject(stubbornFinished, 5000) == WAIT_OBJECT_0,
+            "uninit stopped cancelling a read that ignored the first cancellations");
+    stubbornUnloading.join();
+    CloseHandle(stubbornFinished);
+    Require(stubborn->cancels == 3 && g_pendingDrops == 0 && g_dropReads.empty(),
+            "uninit did not cancel until the read finished or kept the finished read");
     g_unloading = false;
     if (!g_bars) g_bars.emplace();
     g_threadClosing = false;
     fixture::Reset();
-    std::puts("PASS: final uninit waits for admitted operations and pending reads, and bounds a stalled-read drain");
+    std::puts("PASS: final uninit waits for admitted operations and pending reads, and cancels a read until it finishes");
 }

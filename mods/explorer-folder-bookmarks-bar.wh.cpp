@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.21
+// @version         0.8.23
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -3759,9 +3759,18 @@ void OnShellEvent(DISPID id, DISPPARAMS* params) try {
 
 namespace wdt = winrt::Windows::ApplicationModel::DataTransfer;
 
-// Drops whose items are still being read. Unloading waits for them only
-// briefly, so a read that never finishes cannot keep the mod loaded.
+// Drops whose items are still being read. Unloading cancels these reads and
+// waits until every completion has run, so none can call into the unloaded
+// DLL; a read that ignores cancellation delays unloading until it finishes.
 std::atomic<unsigned> g_pendingDrops = 0;
+std::mutex g_dropReadsMutex;
+std::vector<winrt::Windows::Foundation::IAsyncInfo> g_dropReads;
+
+void ForgetDropRead(const winrt::Windows::Foundation::IUnknown& read) {
+    std::lock_guard lock(g_dropReadsMutex);
+    std::erase_if(g_dropReads,
+                  [&](const auto& pending) { return pending == read; });
+}
 
 bool HasStorageItems(const mux::DragEventArgs& args) {
     return args.DataView().Contains(wdt::StandardDataFormats::StorageItems());
@@ -3869,13 +3878,21 @@ void OnBarDrop(const muxc::StackPanel& panel, const mux::DragEventArgs& args) {
             Wh_Log(L"Could not bookmark dropped folders: %08X",
                    winrt::to_hresult().value);
         }
+        ForgetDropRead(completed);
         --g_pendingDrops;
     };
+    // Listed before registering: a read that has already finished completes
+    // inside Completed() and removes itself again.
+    {
+        std::lock_guard lock(g_dropReadsMutex);
+        g_dropReads.push_back(request);
+    }
     ++g_pendingDrops;
     try {
         request.Completed(onRead);
     } catch (...) {
         // Nothing will complete this read, so it must not delay unloading.
+        ForgetDropRead(request);
         --g_pendingDrops;
         Wh_Log(L"Could not wait for the dropped items: %08X",
                winrt::to_hresult().value);
@@ -4746,12 +4763,35 @@ void Wh_ModUninit() {
         }
         g_operationFinished.wait_for(lock, std::chrono::milliseconds(100));
     }
-    for (int attempt = 0; attempt < 50 && g_pendingDrops != 0; ++attempt) {
+    // Cancel pending drop reads and wait until each completion has run; a
+    // completion after unloading would call into the unloaded DLL. Cancel on
+    // every pass, since a read may not take the first cancellation.
+    for (unsigned pass = 0; g_pendingDrops != 0; ++pass) {
+        std::vector<winrt::Windows::Foundation::IAsyncInfo> reads;
+        {
+            std::lock_guard lock(g_dropReadsMutex);
+            reads = g_dropReads;
+        }
+        for (const auto& read : reads) {
+            try {
+                read.Cancel();
+            } catch (...) {
+                if (pass == 0) {
+                    Wh_Log(L"Wh_ModUninit: could not cancel a dropped-item "
+                           L"read: %08X",
+                           winrt::to_hresult().value);
+                }
+            }
+        }
+        if (pass == 50) {
+            Wh_Log(L"Wh_ModUninit: still waiting for %u dropped-item read(s)",
+                   g_pendingDrops.load());
+        }
         Sleep(100);
     }
-    if (g_pendingDrops != 0) {
-        Wh_Log(L"Wh_ModUninit: %u dropped-item read(s) still pending",
-               g_pendingDrops.load());
+    {
+        std::lock_guard lock(g_dropReadsMutex);
+        g_dropReads.clear();
     }
     ForExplorerWindows(CleanupCurrentThread);
     if (g_storageMutex.processMutex) {
