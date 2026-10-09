@@ -404,8 +404,18 @@ void CheckSettingsAndRecents() {
             "recent removal failed");
     ClearRecents();
     Require(fixture::storage[kRecentsKey].empty(), "explorer history not cleared");
+    fixture::storage[kRecentsKey] = L"C:\\kept";
+    fixture::integers[L"recent.enabled"] = 1;
+    LoadSettings();
+    EraseRecentsWhileOff();
+    Require(fixture::storage[kRecentsKey] == L"C:\\kept", "enabled recent folders were erased");
+    fixture::integers[L"recent.enabled"] = 0;
+    Wh_ModSettingsChanged();
+    Require(fixture::storage[kRecentsKey].empty(), "turning recent folders off kept their history");
+    fixture::integers[L"recent.enabled"] = 1;
+    LoadSettings(); // Later groups expect the published settings with recents on.
     fixture::Reset();
-    std::puts("PASS: settings clamps/RC modes, FX validation and recent history");
+    std::puts("PASS: settings clamps/RC modes, FX validation, recent history and erase when off");
 }
 
 void CheckFolderLabels() {

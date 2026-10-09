@@ -140,7 +140,7 @@ compatibility with live Explorer.
 When a check fails, report its name, the observed failure, and whether its input
 represents a real user action or an injected platform fault. Give the matching
 Explorer steps and expected behavior; a fixture failure alone is not evidence
-that the installed mod fails. The suite targets development 0.8.24, so a manual
+that the installed mod fails. The suite targets development 0.8.26, so a manual
 check of a different installed version validates only that version. Installation
 and variant changes remain the user's choice.
 

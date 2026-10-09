@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.24
+// @version         0.8.26
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -78,9 +78,8 @@ the bar, newest on the right: 3 by default, up to 25.
 - Bookmarked and missing folders are skipped. In a narrow window the oldest
   buttons move into RC first.
 
-The mod keeps up to 64 folders opened in File Explorer in its local storage,
-even while the feature is off. To erase them, turn the feature on and
-right-click RC.
+The mod remembers up to 64 folders opened in File Explorer in its local
+storage. Turning the feature off erases them.
 
 ## If the bar doesn't appear
 
@@ -109,7 +108,7 @@ and check the Windhawk log.
 - recent:
   - enabled: false
     $name: Show recent folders
-    $description: The settings below work only while this is on.
+    $description: Turning it off erases the remembered folders. The settings below work only while it is on.
   - buttons: 3
     $name: Buttons
     $description: How many recent folders get a button, 1 to 25.
@@ -1354,6 +1353,25 @@ void ClearRecents() {
         Wh_SetStringValue(kRecentsKey, L"");
     }
     NotifyExplorerBars();
+}
+
+// Nothing is recorded while recent folders are off, and the remembered list
+// is erased, so turning the feature off also clears its history.
+void EraseRecentsWhileOff() try {
+    {
+        std::lock_guard lock(g_settingsMutex);
+        if (g_sharedRecentSettings.enabled) {
+            return;
+        }
+    }
+    std::lock_guard lock(g_storageMutex);
+    if (!ReadValueLocked(kRecentsKey).empty()) {
+        Wh_SetStringValue(kRecentsKey, L"");
+        Wh_Log(L"Recent folders are off: remembered folders erased");
+    }
+} catch (...) {
+    Wh_Log(L"Could not erase remembered folders: %08X",
+           winrt::to_hresult().value);
 }
 
 struct RecentView {
@@ -4707,6 +4725,7 @@ BOOL Wh_ModInit() {
         Wh_Log(L"Could not synchronize bookmark storage: %u", error);
         return FALSE;
     }
+    EraseRecentsWhileOff();
     HMODULE kernelBase = GetModuleHandleW(L"kernelbase.dll");
     auto loadLibraryExW = kernelBase
                               ? reinterpret_cast<LoadLibraryExW_t>(
@@ -4741,6 +4760,7 @@ void Wh_ModAfterInit() {
 void Wh_ModSettingsChanged() {
     try {
         LoadSettings();
+        EraseRecentsWhileOff();
         NotifyExplorerBars();
         Wh_Log(L"Settings published without reloading the mod: generation %llu",
                g_settingsGeneration.load());

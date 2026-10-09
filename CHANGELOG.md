@@ -16,7 +16,8 @@ Development source in `mods/`, not yet tested in File Explorer.
 - **Recent folders** (off by default): buttons at the right end of the bar
   (3 by default, up to 25) and an **RC** menu with the other folders you
   opened in File Explorer, 10 in total by default and up to 25.
-  Middle-click removes one; drag it onto the bookmarks to keep it.
+  Middle-click removes one; drag it onto the bookmarks to keep it. Turning
+  the feature off erases the list.
 - Buttons with the same folder name can also show their parent folder
   (off by default).
 
