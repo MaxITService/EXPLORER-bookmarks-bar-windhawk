@@ -356,8 +356,8 @@ void CheckSettingsAndRecents() {
     fixture::strings[L"fxCustomFolders[5].path"] = L"F:\\valid";
     fixture::strings[L"fxCustomFolders[5].label"] = L" Friendly ";
     LoadSettings();
-    Require(UpdateThreadSettings() && g_recentSettings.enabled && g_recentSettings.buttons == 3 &&
-            g_recentSettings.history == 3 && g_recentSettings.menuButton &&
+    Require(UpdateThreadSettings() && g_recentSettings.enabled && g_recentSettings.buttons == 25 &&
+            g_recentSettings.history == 25 && g_recentSettings.menuButton &&
             g_recentSettings.rightClickClears && g_bookmarkHotkey,
             "settings clamp or clear RC mode failed");
     Require(g_fxFolders.size() == 2 && g_fxFolders[0].label == L"first" &&
@@ -369,7 +369,7 @@ void CheckSettingsAndRecents() {
         fixture::integers[L"recent.history"] = 99;
         LoadSettings();
         Require(UpdateThreadSettings() && g_recentSettings.buttons == 1 &&
-                g_recentSettings.history == 10 && !g_recentSettings.rightClickClears &&
+                g_recentSettings.history == 25 && !g_recentSettings.rightClickClears &&
                 g_recentSettings.menuButton == (std::wstring_view(mode) != L"hidden"),
                 "RC fallback or opposite settings clamp failed");
     }

@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.16
+// @version         0.8.19
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -64,16 +64,17 @@ nothing.
 
 ## Recent folders
 
-Off by default. Turn on **Recent folders → Show recent folders** to show up to
-three folders you recently opened in File Explorer at the right end of the
-bar, newest on the right.
+Off by default. Turn on **Recent folders → Show recent folders** to show
+buttons for folders you recently opened in File Explorer at the right end of
+the bar, newest on the right: 3 by default, up to 25.
 
-- Left-click **RC** for the rest of the list (up to 10 in total).
+- Left-click **RC** for the rest of the list (10 in total by default, up
+  to 25).
 - Right-click **RC** to clear the list.
 - Middle-click a recent folder to remove it; drag it onto the bookmarks to
   keep it.
-- Bookmarked and missing folders are skipped. In a narrow window the buttons
-  move into RC.
+- Bookmarked and missing folders are skipped. In a narrow window the oldest
+  buttons move into RC first.
 
 The mod keeps up to 64 folders opened in File Explorer in its local storage,
 even while the feature is off. To erase them, turn the feature on and
@@ -106,14 +107,14 @@ and check the Windhawk log.
     $description: The settings below work only while this is on.
   - buttons: 3
     $name: Buttons
-    $description: How many recent folders get a button, 1 to 3.
+    $description: How many recent folders get a button, 1 to 25.
     #! $min: 1
-    #! $max: 3
+    #! $max: 25
   - history: 10
     $name: Remembered folders
-    $description: Total in the buttons and the RC menu, 1 to 10.
+    $description: Total in the buttons and the RC menu, 1 to 25.
     #! $min: 1
-    #! $max: 10
+    #! $max: 25
   - rcButton: menu
     $name: RC button
     $description: Menu with the other recent folders.
@@ -222,8 +223,10 @@ constexpr wchar_t kRecentsKey[] = L"recentFolders";
 // More entries than can be listed are kept, so filtering out bookmarks and
 // missing folders still leaves enough recent folders to show.
 constexpr size_t kMaxStoredRecents = 64;
-constexpr int kMaxRecentButtons = 3;
-constexpr int kMaxRecentHistory = 10;
+constexpr int kDefaultRecentButtons = 3;
+constexpr int kMaxRecentButtons = 25;
+constexpr int kDefaultRecentHistory = 10;
+constexpr int kMaxRecentHistory = 25;
 
 constexpr double RowAllocation(unsigned rows) {
     return kRowHeight * rows + kInterRowGap * (rows - 1);
@@ -255,9 +258,9 @@ enum class FolderStatus { Available, Missing, Unknown };
 
 struct RecentSettings {
     bool enabled = false;
-    size_t buttons = kMaxRecentButtons;
+    size_t buttons = kDefaultRecentButtons;
     bool menuButton = true;
-    size_t history = kMaxRecentHistory;
+    size_t history = kDefaultRecentHistory;
     bool rightClickClears = false;
 };
 struct FxFolder {
@@ -1925,8 +1928,10 @@ unsigned WrappedRows(const std::vector<double>& widths, double width) {
 }
 
 // Shows as many recent buttons as fit without adding bookmark rows and
-// returns the width the recents column needs. With RC, the buttons fold into
-// RC together; without it, the oldest (leftmost) buttons are hidden first.
+// returns the width the recents column needs. The oldest (leftmost) buttons
+// are hidden first. With RC, the baseline row count includes the separator and
+// RC; without it, the baseline uses the full width and the separator goes when
+// no button is shown.
 double FitRecents(BarState& state, double width,
                   const std::vector<double>& bookmarkWidths) {
     state.visibleRecents = 0;
@@ -1960,18 +1965,12 @@ double FitRecents(BarState& state, double width,
         return total;
     };
     size_t shown = count;
-    if (hasMenu) {
-        if (count && WrappedRows(bookmarkWidths, width - fixed - newestWidth(count)) >
-                         WrappedRows(bookmarkWidths, width - fixed)) {
-            shown = 0;
-        }
-    } else {
-        unsigned baseline = WrappedRows(bookmarkWidths, width);
-        while (shown > 0 &&
-               WrappedRows(bookmarkWidths,
-                           width - fixed - newestWidth(shown)) > baseline) {
-            --shown;
-        }
+    const unsigned baseline =
+        WrappedRows(bookmarkWidths, hasMenu ? width - fixed : width);
+    while (shown > 0 &&
+           WrappedRows(bookmarkWidths,
+                       width - fixed - newestWidth(shown)) > baseline) {
+        --shown;
     }
     for (size_t i = 1; i <= count; ++i) {
         items[i].Visibility(i > count - shown ? mux::Visibility::Visible

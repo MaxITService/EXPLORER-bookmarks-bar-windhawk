@@ -13,9 +13,9 @@ Development source in `mods/`, not yet tested in File Explorer.
   One Ctrl+B or drop takes at most 20 folders.
 - Right-click a bookmark to open it in a new window.
 - A short notice when the bar is full or a folder is already bookmarked.
-- **Recent folders** (off by default): up to three buttons at the right end
-  of the bar and an **RC** menu with up to ten folders you opened in File
-  Explorer. Middle-click removes one; drag it onto the bookmarks to keep it.
+- **Recent folders** (off by default): buttons at the right end of the bar
+  (3 by default, up to 25) and an **RC** menu with the other folders you
+  opened in File Explorer, 10 in total by default and up to 25. Middle-click removes one; drag it onto the bookmarks to keep it.
 
 ### Changed
 

@@ -86,7 +86,10 @@ void CheckXamlRecentFitting() {
     state.hasRecentMenuButton = true;
     Require(FitRecents(state, 200, {50, 50}) == 70 && state.visibleRecents == 2,
             "spacious recent column hid buttons");
-    Require(FitRecents(state, 150, {50, 50}) == 30 && state.visibleRecents == 0,
+    Require(FitRecents(state, 150, {50, 50}) == 50 && state.visibleRecents == 1 &&
+            fixture.recents.Children().GetAt(1).as<mux::FrameworkElement>().Visibility() == mux::Visibility::Collapsed,
+            "with RC oldest button was not folded first");
+    Require(FitRecents(state, 140, {50, 50}) == 30 && state.visibleRecents == 0,
             "RC did not fold buttons to preserve bookmark row count");
     fixture.recents.Children().RemoveAtEnd();
     state.hasRecentMenuButton = false;

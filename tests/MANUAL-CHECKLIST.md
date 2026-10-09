@@ -10,7 +10,7 @@ Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
 
-Items marked **Development feature** target the development 0.8.16 source.
+Items marked **Development feature** target the development 0.8.18 source.
 The catalog 0.7.8 does not have these features; skip them when unavailable.
 Do not switch variants just to complete this list. The frozen personal and
 Double Decker variants have different feature sets or layouts.
@@ -91,7 +91,7 @@ results, screenshots, backups and generated output outside the repository.
     - **Steps:** With your original backup secured, fill the list with 32
       distinct disposable folders. Try adding a 33rd. Remove one, then retry.
     - **Expected:** The list never exceeds 32 and existing entries are preserved.
-      Adding succeeds after a slot is freed. Development 0.8.16 shows a short
+      Adding succeeds after a slot is freed. Development 0.8.18 shows a short
       notice when the full list prevents an addition.
 
 12. **Wrap, collapse and reach overflow**
@@ -168,13 +168,15 @@ results, screenshots, backups and generated output outside the repository.
 
 20. **Recent folders, RC and promotion — Development feature**
     - **Steps:** Enable Recent and visit several unbookmarked local folders.
-      Open RC and open a listed folder. Narrow
-      and widen the window. Drag a recent folder into bookmarks; middle-click
-      another recent folder. Exercise the configured RC right-click Clear
-      action, then turn Recent off and on before reopening a window.
+      Open RC and open a listed folder. Set **Buttons** and **Remembered
+      folders** to 25 and visit more than 25 folders. Narrow and widen the
+      window. Drag a recent folder into bookmarks; middle-click another
+      recent folder. Exercise the configured RC right-click Clear action,
+      then turn Recent off and on before reopening a window.
     - **Expected:** RC opens without a crash; newest buttons are nearest the
-      right edge and RC stays at the edge when shown. Buttons fold into RC in
-      narrow windows and return when space permits. Promotion creates one
+      right edge and RC stays at the edge when shown. In narrow windows the
+      oldest buttons fold into RC first and return when space permits. Promotion creates one
       persistent bookmark and removes its recent duplicate. Middle-click and
-      Clear affect recent history without deleting folders. Remembered history
-      survives off/on unless cleared.
+      Clear affect recent history without deleting folders. Buttons and RC
+      together list at most the configured number of folders. Remembered
+      history survives off/on unless cleared.
