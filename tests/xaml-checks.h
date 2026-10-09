@@ -642,12 +642,41 @@ void CheckXamlTextFocusAndHotkeys() {
     g_unloading = true;
     Require(key().message == WM_KEYDOWN, "unloading hook consumed Ctrl+B");
     g_unloading = false;
+    fixture::keys[VK_CONTROL] = 0;
+    // An old saved setting cannot bring back the removed Alt+number shortcuts.
+    fixture::integers[L"bookmarkNumberKeys"] = 1;
+    LoadSettings();
+    UpdateThreadSettings();
+    StopThreadWork();
+    std::vector<std::wstring> numbered;
+    for (int i = 1; i <= 9; ++i) numbered.push_back(L"C:\\numbered\\" + std::to_wstring(i));
+    fixture::storage[kBookmarksKey] = JoinLines(numbered);
+    const auto storedBookmarks = fixture::storage[kBookmarksKey];
+    shell.browser->navigated.clear();
+    fixture::keys[VK_MENU] = static_cast<SHORT>(0x8000);
+    for (WPARAM digit = '0'; digit <= '9'; ++digit) {
+        for (LPARAM flags : {LPARAM{0}, LPARAM{1LL << 30}}) {
+            MSG original{};
+            original.hwnd = shell.frame;
+            original.message = WM_SYSKEYDOWN;
+            original.wParam = digit;
+            original.lParam = flags | (1 << 29) | (0x02 << 16) | 1;
+            message = original;
+            ThreadMessageHook(HC_ACTION, PM_REMOVE, reinterpret_cast<LPARAM>(&message));
+            Require(message.message == original.message && message.wParam == original.wParam &&
+                    message.lParam == original.lParam && !g_bookmarkTogglePending && !g_workTimer,
+                    "removed Alt+number shortcut changed the message or queued work");
+        }
+    }
+    Require(shell.browser->navigated.empty() && fixture::storage[kBookmarksKey] == storedBookmarks,
+            "removed Alt+number shortcut navigated or changed bookmarks");
+    fixture::keys[VK_MENU] = 0;
     window.Content(nullptr);
     window.Close();
     fixture::focusWindow = nullptr;
     for (const auto control : controls) DestroyWindow(control);
     StopThreadWork();
-    std::puts("PASS: editable XAML/native controls, Ctrl+B admission, modifiers, repeats and rename focus");
+    std::puts("PASS: editable XAML/native controls, Ctrl+B admission, modifiers, repeats, rename focus and removed Alt+number pass-through");
 }
 
 #include "drag-drop-checks.h"

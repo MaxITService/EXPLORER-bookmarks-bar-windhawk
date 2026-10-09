@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.23
+// @version         0.8.24
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -27,8 +27,8 @@ follows changes made in other windows and in settings.
 
 ## Bookmarks
 
-- **+** bookmarks the current folder. **Ctrl+B** does the same, or removes the
-  bookmark if there is one.
+- **+** bookmarks the current folder. With **Ctrl+B shortcut** on in
+  settings, **Ctrl+B** does the same, or removes the bookmark if there is one.
 - With folders selected in the file list, Ctrl+B bookmarks them all, or
   removes them if all are already bookmarked.
 - Drag folders onto the bar to insert them where you drop them.
@@ -100,7 +100,7 @@ and check the Windhawk log.
         $description: For example C:\Projects, \\server\share or %USERPROFILE%\Pictures.
   $name: FX custom folders
   $description: Extra folders for the FX menu (the button after +), up to 24.
-- bookmarkHotkey: true
+- bookmarkHotkey: false
   $name: Ctrl+B shortcut
   $description: Adds or removes bookmarks for the current or selected folders.
 - parentForDuplicates: false
@@ -277,12 +277,12 @@ struct FxFolder {
 std::mutex g_settingsMutex;
 RecentSettings g_sharedRecentSettings;
 std::vector<FxFolder> g_sharedFxFolders;
-bool g_sharedBookmarkHotkey = true;
+bool g_sharedBookmarkHotkey = false;
 bool g_sharedParentForDuplicates = false;
 std::atomic<ULONGLONG> g_settingsGeneration = 0;
 thread_local RecentSettings g_recentSettings;
 thread_local std::vector<FxFolder> g_fxFolders;
-thread_local bool g_bookmarkHotkey = true;
+thread_local bool g_bookmarkHotkey = false;
 thread_local bool g_parentForDuplicates = false;
 thread_local ULONGLONG g_threadSettingsGeneration = 0;
 thread_local bool g_settingsApplyPending = false;

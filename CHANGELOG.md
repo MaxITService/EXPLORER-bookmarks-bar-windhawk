@@ -6,9 +6,9 @@ Development source in `mods/`, not yet tested in File Explorer.
 
 ### New
 
-- **Ctrl+B** bookmarks the current folder or removes its bookmark. With
-  folders selected in the file list, it bookmarks them all, or removes them
-  if all are bookmarked. Ignored while typing; can be turned off in settings.
+- **Ctrl+B** (off by default) bookmarks the current folder or removes its
+  bookmark. With folders selected in the file list, it bookmarks them all,
+  or removes them if all are bookmarked. Ignored while typing.
 - Drag folders onto the bar to bookmark them where you drop them.
   One Ctrl+B or drop takes at most 20 folders.
 - Right-click a bookmark to open it in a new window.
