@@ -10,7 +10,7 @@ Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
 
-Items marked **Development feature** target the development 0.8.31 source.
+Items marked **Development feature** target the development 0.8.32 source.
 The catalog 0.7.8 does not have these features; skip them when unavailable.
 Do not switch variants just to complete this list. The frozen personal and
 Double Decker variants have different feature sets or layouts.
@@ -91,7 +91,7 @@ results, screenshots, backups and generated output outside the repository.
     - **Steps:** With your original backup secured, fill the list with 32
       distinct disposable folders. Try adding a 33rd. Remove one, then retry.
     - **Expected:** The list never exceeds 32 and existing entries are preserved.
-      Adding succeeds after a slot is freed. Development 0.8.31 shows a short
+      Adding succeeds after a slot is freed. Development 0.8.32 shows a short
       notice when the full list prevents an addition.
 
 12. **Wrap, collapse and reach overflow**
@@ -190,3 +190,14 @@ results, screenshots, backups and generated output outside the repository.
       deleting folders. Buttons and RC together list at most the configured
       number of folders. Turning Recent off erases the remembered folders, so
       RC is empty after turning it back on.
+
+21. **Separate lists for each account — Development feature**
+    - **Steps:** Note the bookmarks and recent folders, update from an
+      earlier version and open a new window. Then open File Explorer in a
+      second Windows account, add a bookmark there and visit a few folders
+      with Recent on. Switch back to the first account.
+    - **Expected:** The first account keeps its bookmarks and recent
+      folders after the update. The second account starts with an empty
+      bar and never shows the first account's bookmarks or recent folders,
+      and the first account doesn't show the second account's. Settings,
+      including FX custom folders, apply to both accounts.

@@ -5,7 +5,7 @@ void CheckBackupAllocationRecovery() {
     BackupFixture backup;
     const std::string sentinel = "existing backup survives out-of-memory serialization";
     backup.Write(sentinel);
-    fixture::storage[kBookmarksKey] = L"C:\\preserved";
+    fixture::storage[g_bookmarksKey] = L"C:\\preserved";
     const auto before = fixture::storage;
     const auto handlesBefore = [&] {
         DWORD handles = 0;
@@ -32,7 +32,7 @@ void CheckBackupAllocationRecovery() {
     Require(!loaded && fixture::storage == before &&
             GetProcessHandleCount(GetCurrentProcess(), &handlesAfter) && handlesBefore == handlesAfter,
             "failed backup input allocation changed storage or leaked its open file handle");
-    Require(LoadBackup(backup.file) && fixture::storage[kBookmarksKey] == L"C:\\imported" &&
+    Require(LoadBackup(backup.file) && fixture::storage[g_bookmarksKey] == L"C:\\imported" &&
             SaveBackup(backup.file), "backup operations did not recover after one-shot allocation faults");
     fixture::Reset();
     std::puts("PASS: out-of-memory backup preservation, file-handle cleanup and subsequent recovery");

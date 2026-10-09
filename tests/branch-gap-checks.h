@@ -81,7 +81,7 @@ void CheckBackupSchemaAndSizeEdges() {
     BackupFixture backup;
     const std::string prefix = "{\"format\":\"explorer-folder-bookmarks-bar\",\"version\":1,\"folders\":";
     const std::string valid = prefix + "[\"C:\\\\valid\"]}";
-    fixture::storage[kBookmarksKey] = L"C:\\sentinel";
+    fixture::storage[g_bookmarksKey] = L"C:\\sentinel";
     const auto sentinel = fixture::storage;
     const std::vector<std::string> rejected{
         "null", "42", "true", "\"text\"",
@@ -123,7 +123,7 @@ void CheckBackupSchemaAndSizeEdges() {
 
 void CheckRecentStorageAndViewEdges() {
     fixture::Reset();
-    fixture::storage[kRecentsKey] = L"\\\\s\\one\n\\\\s\\two";
+    fixture::storage[g_recentsKey] = L"\\\\s\\one\n\\\\s\\two";
     const auto before = fixture::storage;
     const auto writes = fixture::writes;
     RemoveRecent(L"\\\\s\\absent");
@@ -136,7 +136,7 @@ void CheckRecentStorageAndViewEdges() {
     fixture::failWrites = false;
 
     const auto previousSettings = g_recentSettings;
-    fixture::storage[kRecentsKey] =
+    fixture::storage[g_recentsKey] =
         L"C:\\missing\n\\\\s\\one\n\\\\S\\ONE\n\\\\s\\two\n\\\\s\\three";
     fixture::drives[L"C:\\"] = DRIVE_FIXED;
     fixture::attributes[L"C:\\missing"] = {INVALID_FILE_ATTRIBUTES, ERROR_PATH_NOT_FOUND};

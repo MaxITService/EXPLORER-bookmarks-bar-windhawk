@@ -143,7 +143,7 @@ void CheckObservedRecentOpeningAndClear() {
     auto clearContext = event_gap::Context(rc);
     auto context = winrt::make_self<event_gap::ContextArgs>();
     clearContext(rc, context->Event());
-    Require(context->handled && ReadValueLocked(kRecentsKey).empty(),
+    Require(context->handled && ReadValueLocked(g_recentsKey.c_str()).empty(),
             "observed RC context-clear failed");
 
     event_gap::ConfigureRecents(false);
@@ -156,9 +156,9 @@ void CheckObservedRecentOpeningAndClear() {
     g_unloading = true;
     clearClick(clearItem, nullptr);
     g_unloading = false;
-    Require(!ReadValueLocked(kRecentsKey).empty(), "unloading RC clear Click erased history");
+    Require(!ReadValueLocked(g_recentsKey.c_str()).empty(), "unloading RC clear Click erased history");
     clearClick(clearItem, nullptr);
-    Require(ReadValueLocked(kRecentsKey).empty(), "observed context-menu clear Click failed");
+    Require(ReadValueLocked(g_recentsKey.c_str()).empty(), "observed context-menu clear Click failed");
 
     muxc::StackPanel orphan;
     BarState isolated;
@@ -174,10 +174,10 @@ void CheckObservedRecentOpeningAndClear() {
     orphan = nullptr;
     Require(!weakOrphan.get(), "detached RC panel did not expire");
     RecordExplorerRecent(recent);
-    const auto retainedHistory = ReadValueLocked(kRecentsKey);
+    const auto retainedHistory = ReadValueLocked(g_recentsKey.c_str());
     detachedOpening(detachedMenu, nullptr);
     detachedClick(detachedClear, nullptr);
-    Require(detachedMenu.Items().Size() == 1 && ReadValueLocked(kRecentsKey) == retainedHistory,
+    Require(detachedMenu.Items().Size() == 1 && ReadValueLocked(g_recentsKey.c_str()) == retainedHistory,
             "expired RC panel repopulated menu or cleared history");
     RevokeHandlers(isolated.recentHandlers);
     RevokeHandlers(isolated.recentMenuHandlers);

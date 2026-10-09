@@ -3,6 +3,7 @@
 // Include this before the real mod; no production source or SDK is rewritten.
 #define Wh_GetStringValue Editor_GetStringValue
 #define Wh_SetStringValue Editor_SetStringValue
+#define Wh_DeleteValue Editor_DeleteValue
 #define Wh_GetIntSetting Editor_GetIntSetting
 #define Wh_GetStringSetting Editor_GetStringSetting
 #define Wh_Log Editor_Log
@@ -11,6 +12,7 @@
 #include <windhawk_api.h>
 #undef Wh_GetStringValue
 #undef Wh_SetStringValue
+#undef Wh_DeleteValue
 #undef Wh_GetIntSetting
 #undef Wh_GetStringSetting
 #undef Wh_Log
@@ -83,6 +85,12 @@ inline BOOL Wh_SetStringValue(PCWSTR key, PCWSTR value) {
     ++fixture::writes;
     if (fixture::failWrites) return FALSE;
     fixture::storage[key] = value;
+    return TRUE;
+}
+inline BOOL Wh_DeleteValue(PCWSTR key) {
+    ++fixture::writes;
+    if (fixture::failWrites) return FALSE;
+    fixture::storage.erase(key);
     return TRUE;
 }
 inline int Wh_GetIntSetting(PCWSTR key, ...) {

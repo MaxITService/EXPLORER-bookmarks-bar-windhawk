@@ -214,7 +214,7 @@ void CheckNavigationEventAndTrackerGaps() {
     arguments[1].pdispVal = shell.web.get();
     OnShellEvent(kDispidNavigateComplete2, &parameters);
     Require(g_refreshPending && !g_recentSyncPending && g_workTimer &&
-            fixture::storage[kRecentsKey] == scratch.directory,
+            fixture::storage[g_recentsKey] == scratch.directory,
             "valid navigation event lost deferred refresh or recorded wrong argument");
     StopThreadWork();
     const auto writes = fixture::writes;
@@ -297,7 +297,7 @@ void CheckDeferredWorkAndSettingsGaps() {
     Require(!g_settingsApplyPending && !g_bookmarkTogglePending && !g_refreshPending &&
             !g_recentSyncPending && g_pendingNotice.kind == BookmarkNotice::None &&
             !g_threadWorking && !g_activeOperations &&
-            fixture::storage[kBookmarksKey] == scratch.directory,
+            fixture::storage[g_bookmarksKey] == scratch.directory,
             "settings/bookmark/refresh/notice deferred work did not drain completely");
     g_bookmarkTogglePending = shell.frame;
     g_bookmarkToggleFromFileList = true;

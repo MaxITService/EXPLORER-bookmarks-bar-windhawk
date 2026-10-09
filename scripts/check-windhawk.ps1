@@ -100,7 +100,7 @@ try {
     $linkArgs = @("--target=$Target") + $windhawkDefines + @(
         '-shared', '-O2', '-DWH_MOD', '-DWH_EDITING', '-I', $include,
         $sourcePath, '-o', $testDll, '-Wl,--export-all-symbols',
-        '-lole32', '-loleaut32', '-lshell32', '-luuid',
+        '-ladvapi32', '-lole32', '-loleaut32', '-lshell32', '-luuid',
         '-lruntimeobject', '-lwindowscodecs', '-lcomctl32'
     )
     & $compiler @linkArgs

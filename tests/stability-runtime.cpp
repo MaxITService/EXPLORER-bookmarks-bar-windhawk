@@ -333,7 +333,7 @@ void CheckStoredMutations() {
             "oldest history did not trim to storage limit");
     Require(SaveLinesLocked(L"test", {std::wstring(kMaxStorageChars + 1, L'x')}) &&
             fixture::storage[L"test"].empty(), "oversized single history item not dropped");
-    fixture::storage[kBookmarksKey] = std::wstring(kMaxStorageChars + 1, L'x');
+    fixture::storage[g_bookmarksKey] = std::wstring(kMaxStorageChars + 1, L'x');
     Require(ReadStorageLocked().empty(), "oversized read accepted");
     fixture::Reset();
     std::puts("PASS: persisted bookmark operations, no-op moves, failed writes and storage truncation");
@@ -390,32 +390,75 @@ void CheckSettingsAndRecents() {
         Require(RecordExplorerRecent(L"\\\\test.invalid\\share\\" + std::to_wstring(i)),
                 "recent folder not recorded");
     }
-    auto recent = SplitPaths(fixture::storage[kRecentsKey], kMaxStoredRecents + 2);
+    auto recent = SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents + 2);
     Require(recent.size() == kMaxStoredRecents &&
             !RecordExplorerRecent(recent.front()) && RecordExplorerRecent(recent.back()),
             "recent cap, same-front no-op or promotion failed");
-    recent = SplitPaths(fixture::storage[kRecentsKey], kMaxStoredRecents);
+    recent = SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents);
     g_recentSettings.history = 2;
     const auto view = LoadRecentView({recent.front()});
     Require(view.folders.size() == 2 &&
             view.folders[0] == recent[1], "recent view did not filter bookmarks or apply history limit");
     RemoveRecent(recent.front());
-    Require(SplitPaths(fixture::storage[kRecentsKey], kMaxStoredRecents).size() == kMaxStoredRecents - 1,
+    Require(SplitPaths(fixture::storage[g_recentsKey], kMaxStoredRecents).size() == kMaxStoredRecents - 1,
             "recent removal failed");
     ClearRecents();
-    Require(fixture::storage[kRecentsKey].empty(), "explorer history not cleared");
-    fixture::storage[kRecentsKey] = L"C:\\kept";
+    Require(fixture::storage[g_recentsKey].empty(), "explorer history not cleared");
+    fixture::storage[g_recentsKey] = L"C:\\kept";
     fixture::integers[L"recent.enabled"] = 1;
     LoadSettings();
     EraseRecentsWhileOff();
-    Require(fixture::storage[kRecentsKey] == L"C:\\kept", "enabled recent folders were erased");
+    Require(fixture::storage[g_recentsKey] == L"C:\\kept", "enabled recent folders were erased");
     fixture::integers[L"recent.enabled"] = 0;
     Wh_ModSettingsChanged();
-    Require(fixture::storage[kRecentsKey].empty(), "turning recent folders off kept their history");
+    Require(fixture::storage[g_recentsKey].empty(), "turning recent folders off kept their history");
     fixture::integers[L"recent.enabled"] = 1;
     LoadSettings(); // Later groups expect the published settings with recents on.
     fixture::Reset();
     std::puts("PASS: settings clamps/RC modes, FX validation, recent history and erase when off");
+}
+
+void CheckPerUserStorage() {
+    fixture::Reset();
+    const auto sid = CurrentUserSid();
+    Require(sid.starts_with(L"S-1-"), "account SID unavailable");
+    const std::wstring sharedBookmarks = kSharedBookmarksKey;
+    const std::wstring sharedRecents = kSharedRecentsKey;
+    fixture::storage[sharedBookmarks] = L"C:\\shared";
+    fixture::storage[sharedRecents] = L"C:\\recent";
+    InitUserStorage();
+    Require(g_bookmarksKey == sharedBookmarks + L"_" + sid &&
+            g_recentsKey == sharedRecents + L"_" + sid,
+            "storage value names do not end with the account SID");
+    Require(fixture::storage[g_bookmarksKey] == L"C:\\shared" &&
+            fixture::storage[g_recentsKey] == L"C:\\recent" &&
+            !fixture::storage.contains(sharedBookmarks) &&
+            !fixture::storage.contains(sharedRecents),
+            "shared lists did not move to the account");
+    Require(AddBookmark(L"C:\\own").changed && RecordExplorerRecent(L"C:\\opened") &&
+            ReadStorageLocked() == L"C:\\shared\nC:\\own" &&
+            !fixture::storage.contains(sharedBookmarks) &&
+            !fixture::storage.contains(sharedRecents),
+            "account edits wrote the shared values");
+    fixture::storage[sharedBookmarks + L"_S-1-5-21-1-2-3-1001"] = L"C:\\other";
+    fixture::storage[sharedRecents + L"_S-1-5-21-1-2-3-1001"] = L"C:\\other";
+    InitUserStorage();
+    Require(ReadStorageLocked() == L"C:\\shared\nC:\\own" &&
+            fixture::storage[g_recentsKey] == L"C:\\opened\nC:\\recent",
+            "another account's lists were read or a restart changed this account's lists");
+    // An older version wrote the shared list after the move: it is newer.
+    fixture::storage[sharedBookmarks] = L"D:\\newer";
+    InitUserStorage();
+    Require(ReadStorageLocked() == L"D:\\newer" && !fixture::storage.contains(sharedBookmarks),
+            "a later shared list did not replace the account's list");
+    fixture::storage[sharedBookmarks] = L"E:\\kept";
+    fixture::failWrites = true;
+    InitUserStorage();
+    fixture::failWrites = false;
+    Require(fixture::storage[sharedBookmarks] == L"E:\\kept" && ReadStorageLocked() == L"D:\\newer",
+            "a failed move lost the shared list or changed the account's list");
+    fixture::Reset();
+    std::puts("PASS: per-account value names, one-time move of shared lists and failed-move retention");
 }
 
 void CheckFolderLabels() {
@@ -484,7 +527,7 @@ void CheckBackupFiles() {
     const std::vector<std::wstring> expected{L"C:\\Папка", L"\\\\test.invalid\\日本語"};
     Require(SaveBookmarksLocked(expected) && SaveBackup(backup.file),
             "Unicode backup save failed");
-    fixture::storage[kBookmarksKey] = L"C:\\sentinel";
+    fixture::storage[g_bookmarksKey] = L"C:\\sentinel";
     Require(LoadBackup(backup.file) && SplitBookmarks(ReadStorageLocked()) == expected,
             "real JSON file round trip failed");
     Require(SaveBackup(backup.file), "atomic replacement of existing backup failed");
@@ -725,6 +768,7 @@ int main(int argc, char** argv) {
     CheckInsertionMatrix();
     CheckStoredMutations();
     CheckSettingsAndRecents();
+    CheckPerUserStorage();
     CheckFolderLabels();
     CheckBackupFiles();
     CheckFramesAndSettings();

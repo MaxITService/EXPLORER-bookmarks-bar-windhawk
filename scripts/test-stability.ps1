@@ -41,7 +41,7 @@ try {
     & $compiler '--target=x86_64-w64-windows-gnu' '-std=c++23' '-O1' '-static' `
         '-DUNICODE' '-D_UNICODE' '-DWINVER=0x0A00' '-D_WIN32_WINNT=0x0A00' `
         '-D_WIN32_IE=0x0A00' '-DNTDDI_VERSION=0x0A000008' '-DWH_MOD' '-DWH_EDITING' `
-        @coverageFlags '-I' $buildDirectory '-I' (Join-Path $projectRoot 'tests') '-I' $include $testSource '-o' $testExe '-lole32' '-loleaut32' '-lshell32' `
+        @coverageFlags '-I' $buildDirectory '-I' (Join-Path $projectRoot 'tests') '-I' $include $testSource '-o' $testExe '-ladvapi32' '-lole32' '-loleaut32' '-lshell32' `
         '-luuid' '-lruntimeobject' '-lwindowscodecs' '-lcomctl32' '-lwer'
     if ($LASTEXITCODE -ne 0) { throw 'Stability test build failed' }
     if ($PreviewXaml) {

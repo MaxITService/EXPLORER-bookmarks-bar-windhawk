@@ -23,6 +23,9 @@ Development source in `mods/`, tested in File Explorer.
 
 ### Changed
 
+- Bookmarks and recent folders are kept separately for each Windows
+  account. After the update, the shared list moves to the first account
+  that opens File Explorer.
 - Disabling or recompiling the mod while dropped folders are still being
   read cancels that read and waits for it to finish.
 - Saved settings apply to open windows; no new window needed.

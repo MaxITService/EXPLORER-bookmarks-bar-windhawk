@@ -20,7 +20,7 @@ void CheckBackupPlatformFailures() {
     fixture::Reset();
     BackupFixture backup;
     const std::string sentinel = "previous backup survives every failed save";
-    fixture::storage[kBookmarksKey] = L"C:\\source";
+    fixture::storage[g_bookmarksKey] = L"C:\\source";
     for (unsigned stage = 0; stage < 7; ++stage) {
         backup.Write(sentinel);
         platform_failure::Scope injected;
@@ -33,7 +33,7 @@ void CheckBackupPlatformFailures() {
         if (stage == 5) f.move = true;
         if (stage == 6) f.wideConversion = true;
         Require(!SaveBackup(backup.file) && PlatformReadBytes(backup.file) == sentinel &&
-                fixture::storage[kBookmarksKey] == L"C:\\source",
+                fixture::storage[g_bookmarksKey] == L"C:\\source",
                 "failed backup save replaced destination or changed bookmark storage");
         if (stage >= 1 && stage <= 5) {
             Require(!f.temporary.empty() && f.deleteCalls == 1 &&
@@ -64,7 +64,7 @@ void CheckBackupPlatformFailures() {
         Require(!LoadBackup(backup.file) && fixture::storage == storage,
                 "failed backup import changed persisted bookmarks");
     }
-    Require(LoadBackup(backup.file) && fixture::storage[kBookmarksKey] == L"C:\\imported",
+    Require(LoadBackup(backup.file) && fixture::storage[g_bookmarksKey] == L"C:\\imported",
             "backup import did not recover after native faults were removed");
     fixture::Reset();
     std::puts("PASS: atomic backup preservation/cleanup, failed/short transfers, size and conversion failures");

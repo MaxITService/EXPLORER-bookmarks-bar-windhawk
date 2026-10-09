@@ -502,7 +502,7 @@ void CheckXamlMenuActionsAndNotices() {
     InvokeControl<muxc::MenuFlyoutItem, mux::Automation::Peers::MenuFlyoutItemAutomationPeer>(save);
     Require(GetFileAttributesW(scratch.file.c_str()) != INVALID_FILE_ATTRIBUTES &&
             fakeDialog->shows == 1, "real XAML Save command did not export backup");
-    fixture::storage[kBookmarksKey] = L"C:\\different";
+    fixture::storage[g_bookmarksKey] = L"C:\\different";
     auto load = backupMenu.Items().GetAt(1).as<muxc::MenuFlyoutItem>();
     InvokeControl<muxc::MenuFlyoutItem, mux::Automation::Peers::MenuFlyoutItemAutomationPeer>(load);
     Require(ReadStorageLocked() == scratch.directory, "real XAML Load command did not restore backup");
@@ -562,7 +562,7 @@ void CheckXamlMenuActionsAndNotices() {
     auto clearMenu = rc.ContextFlyout().as<muxc::MenuFlyout>();
     auto clear = clearMenu.Items().GetAt(0).as<muxc::MenuFlyoutItem>();
     InvokeControl<muxc::MenuFlyoutItem, mux::Automation::Peers::MenuFlyoutItemAutomationPeer>(clear);
-    Require(fixture::storage[kRecentsKey].empty(), "RC clear menu did not clear recent storage");
+    Require(fixture::storage[g_recentsKey].empty(), "RC clear menu did not clear recent storage");
     fakeDialog->showResult = HRESULT_FROM_WIN32(ERROR_CANCELLED);
     const auto shown = fakeDialog->shows;
     auto currentSave = BarButtons(fixture.panel)[0].ContextFlyout().as<muxc::MenuFlyout>()
@@ -650,8 +650,8 @@ void CheckXamlTextFocusAndHotkeys() {
     StopThreadWork();
     std::vector<std::wstring> numbered;
     for (int i = 1; i <= 9; ++i) numbered.push_back(L"C:\\numbered\\" + std::to_wstring(i));
-    fixture::storage[kBookmarksKey] = JoinLines(numbered);
-    const auto storedBookmarks = fixture::storage[kBookmarksKey];
+    fixture::storage[g_bookmarksKey] = JoinLines(numbered);
+    const auto storedBookmarks = fixture::storage[g_bookmarksKey];
     shell.browser->navigated.clear();
     fixture::keys[VK_MENU] = static_cast<SHORT>(0x8000);
     for (WPARAM digit = '0'; digit <= '9'; ++digit) {
@@ -668,7 +668,7 @@ void CheckXamlTextFocusAndHotkeys() {
                     "removed Alt+number shortcut changed the message or queued work");
         }
     }
-    Require(shell.browser->navigated.empty() && fixture::storage[kBookmarksKey] == storedBookmarks,
+    Require(shell.browser->navigated.empty() && fixture::storage[g_bookmarksKey] == storedBookmarks,
             "removed Alt+number shortcut navigated or changed bookmarks");
     fixture::keys[VK_MENU] = 0;
     window.Content(nullptr);
