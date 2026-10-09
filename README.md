@@ -13,7 +13,7 @@ A [Windhawk](https://windhawk.net/) mod for Windows 11 File Explorer on x64 and 
 | Version | Source | Status |
 | --- | --- | --- |
 | **0.7.8** | [Root source](explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/explorer-folder-bookmarks-bar.wh.cpp) | Tested in File Explorer. In the Windhawk catalog since September 29, 2026 ([PR #5755](https://github.com/ramensoftware/windhawk-mods/pull/5755)). |
-| **0.8.31** | [Development source](mods/explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/mods/explorer-folder-bookmarks-bar.wh.cpp) | Source only, **untested** in File Explorer. New features are listed in the [changelog](CHANGELOG.md). |
+| **0.8.31** | [Development source](mods/explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/mods/explorer-folder-bookmarks-bar.wh.cpp) | Source only, tested in File Explorer. New features are listed in the [changelog](CHANGELOG.md). |
 
 The root file is the tested 0.7.8 release, unchanged. Development happens in `mods/`.
 

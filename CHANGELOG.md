@@ -2,7 +2,7 @@
 
 ## Unreleased: changes since 0.7.8
 
-Development source in `mods/`, not yet tested in File Explorer.
+Development source in `mods/`, tested in File Explorer.
 
 ### New
 
