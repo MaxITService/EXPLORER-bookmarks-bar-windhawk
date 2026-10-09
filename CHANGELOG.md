@@ -50,8 +50,9 @@ Development source in `mods/`, tested in File Explorer.
 - A backup whose path contains a hidden NUL character is rejected instead
   of loading a shortened path.
 - Errors in the bar's click, menu and drag handlers are caught and logged.
-- Disabling or updating the mod while a bar click is still being handled
-  waits for that click to finish instead of risking an Explorer crash.
+- Disabling or updating the mod while a bar click is still being handled,
+  or while a new window's bar is still being built, waits for it to finish
+  instead of risking an Explorer crash.
 
 ## 0.7.8 (2026-09-29)
 

@@ -410,6 +410,64 @@ void CheckXamlCommandBarInstallation() {
     std::puts("PASS: real XAML loaded/unloaded installation, unknown-header guard, discovery and idempotent cleanup");
 }
 
+namespace track_unload {
+inline unsigned iconLookups = 0;
+inline unsigned operationsDuringLookup = 0;
+}
+
+// A new window's command bar builds the bar, and its Shell icon lookup can
+// pump the cleanup that unloading sends to the thread. Unloading must wait for
+// the build, and a command bar that appears after unloading began gets no bar.
+void CheckCommandBarTrackingDuringUnload() {
+    fixture::Reset();
+    platform_failure::Scope faults;
+    const std::wstring folder = L"C:\\TrackUnloadFixture";
+    fixture::drives[L"C:\\"] = DRIVE_FIXED;
+    fixture::attributes[folder] = {FILE_ATTRIBUTE_DIRECTORY, ERROR_SUCCESS};
+    platform_failure::faults.shellIcon = platform_failure::ShellIcon::OwnedIcon;
+    Require(SaveBookmarksLocked({folder}), "unload tracking fixture bookmark not saved");
+    LoadSettings();
+    UpdateThreadSettings();
+    if (!g_bars) g_bars.emplace();
+    g_threadClosing = false;
+    g_frameHooked = true;
+    ExplorerHeaderFixture header;
+    mux::Window window;
+    window.Content(header.root);
+    window.AppWindow().Resize({800, 400});
+    window.AppWindow().Show();
+    window.Activate();
+    PumpXamlMessages(300);
+    BeginUnloading();
+    TrackCommandBar(header.command);
+    Require(g_bars->empty() && !g_activeOperations,
+            "a command bar that appeared after unloading began was tracked");
+    g_unloading = false;
+    track_unload::iconLookups = 0;
+    track_unload::operationsDuringLookup = 0;
+    platform_failure::faults.onShellIcon = [] {
+        ++track_unload::iconLookups;
+        track_unload::operationsDuringLookup = g_activeOperations;
+        // Unloading begins while the bar is being built.
+        BeginUnloading();
+    };
+    TrackCommandBar(header.command);
+    platform_failure::faults.onShellIcon = nullptr;
+    Require(track_unload::iconLookups == 1 && track_unload::operationsDuringLookup == 1,
+            "unloading would not wait for a bar being built");
+    Require(g_bars->size() == 1 && g_bars->front().strip.get() && !g_activeOperations,
+            "bar build interrupted by unloading did not finish or leaked its operation");
+    g_unloading = false;
+    window.Close();
+    CleanupCurrentThread();
+    Require(!g_bars && !g_messageHook && !g_workTimer,
+            "thread cleanup after an interrupted bar build retained state");
+    g_bars.emplace();
+    g_frameHooked = false;
+    fixture::Reset();
+    std::puts("PASS: unloading waits for a bar being built and skips command bars found after it began");
+}
+
 void CheckLiveWindowSizing() {
     fixture::Reset();
     fixture::integers[L"recent.enabled"] = 1;
@@ -713,6 +771,7 @@ void CheckXamlRuntime() {
     CheckRecentPointerPromotionAndMouseRecovery();
     CheckXamlCommandBarInstallation();
     CheckXamlInstallationDiscoveryGaps();
+    CheckCommandBarTrackingDuringUnload();
     CheckLiveWindowSizing();
     CheckXamlMenuActionsAndNotices();
     CheckXamlTextFocusAndHotkeys();

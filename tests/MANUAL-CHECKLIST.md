@@ -10,7 +10,7 @@ Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
 
-Items marked **Development feature** target the development 0.8.34 source.
+Items marked **Development feature** target the development 0.8.35 source.
 The catalog 0.7.8 does not have these features; skip them when unavailable.
 Do not switch variants just to complete this list. The frozen personal and
 Double Decker variants have different feature sets or layouts.
@@ -91,7 +91,7 @@ results, screenshots, backups and generated output outside the repository.
     - **Steps:** With your original backup secured, fill the list with 32
       distinct disposable folders. Try adding a 33rd. Remove one, then retry.
     - **Expected:** The list never exceeds 32 and existing entries are preserved.
-      Adding succeeds after a slot is freed. Development 0.8.34 shows a short
+      Adding succeeds after a slot is freed. Development 0.8.35 shows a short
       notice when the full list prevents an addition.
 
 12. **Wrap, collapse and reach overflow**

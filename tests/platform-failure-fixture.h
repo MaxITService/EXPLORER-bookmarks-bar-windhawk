@@ -39,6 +39,8 @@ struct Faults {
     std::wstring volumeName;
     bool coInitialize = false;
     ShellIcon shellIcon = ShellIcon::Normal;
+    // Runs inside each Shell icon lookup, where Shell can pump messages.
+    void (*onShellIcon)() = nullptr;
     unsigned tempCalls = 0;
     unsigned writeCalls = 0;
     unsigned flushCalls = 0;
@@ -151,6 +153,7 @@ inline HRESULT WINAPI PlatformCoInitializeEx(LPVOID reserved, DWORD apartment) {
     return CoInitializeEx(reserved, apartment);
 }
 inline DWORD_PTR WINAPI PlatformSHGetFileInfoW(LPCWSTR path, DWORD attributes, SHFILEINFOW* info, UINT size, UINT flags) {
+    if (platform_failure::faults.onShellIcon) platform_failure::faults.onShellIcon();
     switch (platform_failure::faults.shellIcon) {
     case platform_failure::ShellIcon::Fail: return 0;
     case platform_failure::ShellIcon::NoIcon: info->hIcon = nullptr; return 1;
