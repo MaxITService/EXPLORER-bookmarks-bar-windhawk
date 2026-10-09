@@ -10,7 +10,7 @@ Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
 
-Items marked **Development feature** target the development 0.8.18 source.
+Items marked **Development feature** target the development 0.8.21 source.
 The catalog 0.7.8 does not have these features; skip them when unavailable.
 Do not switch variants just to complete this list. The frozen personal and
 Double Decker variants have different feature sets or layouts.
@@ -91,7 +91,7 @@ results, screenshots, backups and generated output outside the repository.
     - **Steps:** With your original backup secured, fill the list with 32
       distinct disposable folders. Try adding a 33rd. Remove one, then retry.
     - **Expected:** The list never exceeds 32 and existing entries are preserved.
-      Adding succeeds after a slot is freed. Development 0.8.18 shows a short
+      Adding succeeds after a slot is freed. Development 0.8.21 shows a short
       notice when the full list prevents an addition.
 
 12. **Wrap, collapse and reach overflow**
@@ -105,9 +105,15 @@ results, screenshots, backups and generated output outside the repository.
 13. **Labels, tooltips, themes and display scaling**
     - **Steps:** Hover bookmarks with long, spaced and non-Latin names. Check
       light and dark themes and, if available, another display scaling setting.
+      Turn on **Show parent of same-named folders** and bookmark two folders
+      named `src` from different projects, one with a long project name; also
+      visit a third `src` so it gets a recent button.
     - **Expected:** Tooltips show the full correct paths, labels remain readable
       with ellipsis when necessary, and icons and hit areas remain aligned.
-      There is no text overlap or unusable control.
+      There is no text overlap or unusable control. Same-named buttons and RC
+      entries show their parent (`projA\src`); a long parent is cut, the name
+      is not. Unique names are unchanged, and nothing changes with the setting
+      off.
 
 14. **FX standard and custom folders**
     - **Steps:** Left-click FX and open its standard entries. Add a custom label
@@ -175,8 +181,8 @@ results, screenshots, backups and generated output outside the repository.
       then turn Recent off and on before reopening a window.
     - **Expected:** RC opens without a crash; newest buttons are nearest the
       right edge and RC stays at the edge when shown. In narrow windows the
-      oldest buttons fold into RC first and return when space permits. Promotion creates one
-      persistent bookmark and removes its recent duplicate. Middle-click and
-      Clear affect recent history without deleting folders. Buttons and RC
-      together list at most the configured number of folders. Remembered
-      history survives off/on unless cleared.
+      oldest buttons fold into RC first and return when space permits.
+      Promotion creates one persistent bookmark and removes its recent
+      duplicate. Middle-click and Clear affect recent history without
+      deleting folders. Buttons and RC together list at most the configured
+      number of folders. Remembered history survives off/on unless cleared.

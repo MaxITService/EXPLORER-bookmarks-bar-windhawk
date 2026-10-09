@@ -15,7 +15,10 @@ Development source in `mods/`, not yet tested in File Explorer.
 - A short notice when the bar is full or a folder is already bookmarked.
 - **Recent folders** (off by default): buttons at the right end of the bar
   (3 by default, up to 25) and an **RC** menu with the other folders you
-  opened in File Explorer, 10 in total by default and up to 25. Middle-click removes one; drag it onto the bookmarks to keep it.
+  opened in File Explorer, 10 in total by default and up to 25.
+  Middle-click removes one; drag it onto the bookmarks to keep it.
+- Buttons with the same folder name can also show their parent folder
+  (off by default).
 
 ### Changed
 

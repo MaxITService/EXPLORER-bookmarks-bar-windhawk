@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.19
+// @version         0.8.21
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -38,6 +38,8 @@ follows changes made in other windows and in settings.
   a new window.
 - Drag a bookmark to reorder. Middle-click removes it; the folder itself is
   not touched.
+- With **Show parent of same-named folders** on in settings, buttons with
+  the same name also show their parent folder: `projA\src`, `projB\src`.
 - Hover shows the full path. A missing folder on a local disk gets a yellow
   warning icon. Custom folder icons (desktop.ini) are shown.
 - Virtual locations such as Home can't be bookmarked.
@@ -101,6 +103,9 @@ and check the Windhawk log.
 - bookmarkHotkey: true
   $name: Ctrl+B shortcut
   $description: Adds or removes bookmarks for the current or selected folders.
+- parentForDuplicates: false
+  $name: Show parent of same-named folders
+  $description: Buttons with the same folder name also show their parent, for example projA\src and projB\src.
 - recent:
   - enabled: false
     $name: Show recent folders
@@ -273,10 +278,12 @@ std::mutex g_settingsMutex;
 RecentSettings g_sharedRecentSettings;
 std::vector<FxFolder> g_sharedFxFolders;
 bool g_sharedBookmarkHotkey = true;
+bool g_sharedParentForDuplicates = false;
 std::atomic<ULONGLONG> g_settingsGeneration = 0;
 thread_local RecentSettings g_recentSettings;
 thread_local std::vector<FxFolder> g_fxFolders;
 thread_local bool g_bookmarkHotkey = true;
+thread_local bool g_parentForDuplicates = false;
 thread_local ULONGLONG g_threadSettingsGeneration = 0;
 thread_local bool g_settingsApplyPending = false;
 
@@ -288,6 +295,7 @@ bool UpdateThreadSettings() {
     g_recentSettings = g_sharedRecentSettings;
     g_fxFolders = g_sharedFxFolders;
     g_bookmarkHotkey = g_sharedBookmarkHotkey;
+    g_parentForDuplicates = g_sharedParentForDuplicates;
     g_threadSettingsGeneration = g_settingsGeneration.load();
     g_settingsApplyPending = true;
     return true;
@@ -399,6 +407,8 @@ struct BarState {
     bool reflowing = false;
     std::wstring renderedKey;
     std::wstring renderedRecentKey;
+    // Parent parts of the bookmark labels; they can depend on the recents.
+    std::wstring renderedLabelKey;
     ULONGLONG renderedSettingsGeneration = 0;
     bool renderComplete = false;
     bool refreshAfterDrag = false;
@@ -1124,6 +1134,81 @@ std::wstring ButtonLabel(const std::wstring& path) {
     return path.substr(pos + 1);
 }
 
+// A button label: the folder name, plus enough parent folders to tell it
+// apart from other buttons with the same name (empty when not needed).
+struct FolderLabel {
+    std::wstring parent;
+    std::wstring name;
+};
+
+std::wstring LabelText(const FolderLabel& label) {
+    return label.parent.empty() ? label.name : label.parent + L"\\" + label.name;
+}
+
+std::vector<FolderLabel> FolderLabels(const std::vector<std::wstring>& paths,
+                                      bool showParents) {
+    std::vector<FolderLabel> labels;
+    std::vector<std::vector<std::wstring>> parents(paths.size());
+    for (size_t i = 0; i < paths.size(); ++i) {
+        labels.push_back({{}, ButtonLabel(paths[i])});
+        // Drive roots and other paths without a folder name keep their label.
+        if (!showParents || labels[i].name == paths[i]) {
+            continue;
+        }
+        size_t start = 0;
+        while (start < paths[i].size()) {
+            size_t end = paths[i].find_first_of(L"\\/", start);
+            if (end == std::wstring::npos) {
+                end = paths[i].size();
+            }
+            if (end > start) {
+                parents[i].push_back(paths[i].substr(start, end - start));
+            }
+            start = end + 1;
+        }
+        if (!parents[i].empty()) {
+            parents[i].pop_back();
+        }
+    }
+    auto suffix = [&](size_t index, size_t levels) {
+        const auto& parts = parents[index];
+        std::wstring text;
+        for (size_t k = parts.size() - std::min(levels, parts.size());
+             k < parts.size(); ++k) {
+            if (!text.empty()) {
+                text += L'\\';
+            }
+            text += parts[k];
+        }
+        return text;
+    };
+    for (size_t i = 0; i < paths.size(); ++i) {
+        if (parents[i].empty()) {
+            continue;
+        }
+        std::vector<size_t> others;
+        for (size_t j = 0; j < paths.size(); ++j) {
+            if (j != i && !parents[j].empty() &&
+                SamePath(labels[j].name, labels[i].name)) {
+                others.push_back(j);
+            }
+        }
+        if (others.empty()) {
+            continue;
+        }
+        // Add parent levels until no other button shows the same text.
+        size_t levels = 1;
+        while (levels < parents[i].size() &&
+               std::any_of(others.begin(), others.end(), [&](size_t j) {
+                   return SamePath(suffix(i, levels), suffix(j, levels));
+               })) {
+            ++levels;
+        }
+        labels[i].parent = suffix(i, levels);
+    }
+    return labels;
+}
+
 std::wstring TrimSetting(std::wstring value) {
     auto nonSpace = [](wchar_t ch) { return !iswspace(ch); };
     auto first = std::find_if(value.begin(), value.end(), nonSpace);
@@ -1219,16 +1304,19 @@ void LoadSettings() {
     recent.rightClickClears = rcMode == L"clear";
     auto folders = LoadFxCustomFolders();
     const bool hotkey = Wh_GetIntSetting(L"bookmarkHotkey") != 0;
+    const bool parents = Wh_GetIntSetting(L"parentForDuplicates") != 0;
     {
         std::lock_guard lock(g_settingsMutex);
         g_sharedRecentSettings = recent;
         g_sharedFxFolders = std::move(folders);
         g_sharedBookmarkHotkey = hotkey;
+        g_sharedParentForDuplicates = parents;
         ++g_settingsGeneration;
     }
-    Wh_Log(L"Recent folders: %ls, %zu button(s), %zu remembered, RC %ls",
+    Wh_Log(L"Recent folders: %ls, %zu button(s), %zu remembered, RC %ls; "
+           L"parents for duplicates %ls",
            recent.enabled ? L"on" : L"off", recent.buttons,
-           recent.history, rcMode.data());
+           recent.history, rcMode.data(), parents ? L"on" : L"off");
 }
 
 // Returns true when the stored order changed.
@@ -1271,6 +1359,8 @@ void ClearRecents() {
 struct RecentView {
     // Newest first, at most the configured history length.
     std::vector<std::wstring> folders;
+    // Labels of the folders that get a button.
+    std::vector<FolderLabel> labels;
 };
 
 RecentView LoadRecentView(const std::vector<std::wstring>& bookmarks) {
@@ -2314,20 +2404,51 @@ muxc::Button MakeLabelButton(const wchar_t* text) {
     return button;
 }
 
+muxc::TextBlock MakeFolderText(const std::wstring& text) {
+    muxc::TextBlock block;
+    block.Text(winrt::hstring(text));
+    block.VerticalAlignment(mux::VerticalAlignment::Center);
+    block.FontSize(14);
+    block.TextTrimming(mux::TextTrimming::CharacterEllipsis);
+    return block;
+}
+
+// An empty label name means the plain folder name.
 muxc::Button MakeFolderButton(const std::wstring& path, FolderStatus status,
-                              const std::wstring& tooltip) {
+                              const std::wstring& tooltip,
+                              const FolderLabel& folderLabel = {}) {
     muxc::Button button;
     muxc::StackPanel content;
     content.Orientation(muxc::Orientation::Horizontal);
     content.VerticalAlignment(mux::VerticalAlignment::Center);
     content.Children().Append(FolderIcon(path, status));
-    muxc::TextBlock label;
-    label.Text(winrt::hstring(ButtonLabel(path)));
+    const std::wstring name =
+        folderLabel.name.empty() ? ButtonLabel(path) : folderLabel.name;
+    mux::FrameworkElement label{nullptr};
+    if (folderLabel.parent.empty()) {
+        label = MakeFolderText(name);
+    } else {
+        // The parent takes the width the name leaves and is trimmed first,
+        // so the folder name stays visible: "projA\src", "pro…\src".
+        muxc::Grid parts;
+        muxc::ColumnDefinition parentColumn;
+        parentColumn.Width({1, mux::GridUnitType::Star});
+        muxc::ColumnDefinition nameColumn;
+        nameColumn.Width({0, mux::GridUnitType::Auto});
+        parts.ColumnDefinitions().Append(parentColumn);
+        parts.ColumnDefinitions().Append(nameColumn);
+        parts.HorizontalAlignment(mux::HorizontalAlignment::Left);
+        auto parentText = MakeFolderText(folderLabel.parent);
+        auto nameText = MakeFolderText(L"\\" + name);
+        nameText.MaxWidth(110);
+        muxc::Grid::SetColumn(nameText, 1);
+        parts.Children().Append(parentText);
+        parts.Children().Append(nameText);
+        label = parts;
+    }
     label.VerticalAlignment(mux::VerticalAlignment::Center);
     label.Margin(mux::Thickness{8, 0, 0, 0});
     label.MaxWidth(155);
-    label.FontSize(14);
-    label.TextTrimming(mux::TextTrimming::CharacterEllipsis);
     if (status == FolderStatus::Missing) {
         label.Opacity(0.7);
     }
@@ -2405,7 +2526,8 @@ bool RefreshFolderButtons(std::vector<FolderButtonState>& buttons, bool recent,
         }
         entry.iconLoadedAt = FolderIconLoadedAt(entry.path);
         if (status != entry.status) {
-            auto label = content.Children().GetAt(1).as<muxc::TextBlock>();
+            // The label text stays; it may be a TextBlock or a parent/name Grid.
+            auto label = content.Children().GetAt(1).as<mux::UIElement>();
             label.Opacity(status == FolderStatus::Missing ? 0.7 : 1.0);
             muxc::ToolTipService::SetToolTip(
                 button, winrt::box_value(winrt::hstring(
@@ -2635,11 +2757,20 @@ void FillRecentMenu(BarState& state, const muxc::MenuFlyout& menu,
                                          ? L"No recent folders"
                                          : L"No other recent folders");
     } else {
+        // Same rule as the buttons, over the bookmarks and the whole list.
+        std::vector<std::wstring> paths;
+        for (const auto& bookmark : state.folderButtons) {
+            paths.push_back(bookmark.path);
+        }
+        const size_t firstRecent = paths.size();
+        paths.insert(paths.end(), state.recentFolders.begin(),
+                     state.recentFolders.end());
+        const auto labels = FolderLabels(paths, g_parentForDuplicates);
         for (size_t i = state.visibleRecents; i < state.recentFolders.size();
              ++i) {
             const auto& path = state.recentFolders[i];
             muxc::MenuFlyoutItem item;
-            item.Text(winrt::hstring(ButtonLabel(path)));
+            item.Text(winrt::hstring(LabelText(labels[firstRecent + i])));
             muxc::ToolTipService::SetToolTip(
                 item, winrt::box_value(winrt::hstring(path)));
             TrackClick(state.recentMenuHandlers, item, [path, weakAnchor](
@@ -2655,7 +2786,8 @@ void FillRecentMenu(BarState& state, const muxc::MenuFlyout& menu,
 }
 
 void AppendRecents(BarState& state, const muxc::StackPanel& recents,
-                   const winrt::weak_ref<muxc::StackPanel>& weakPanel) {
+                   const winrt::weak_ref<muxc::StackPanel>& weakPanel,
+                   const std::vector<FolderLabel>& labels = {}) {
     muxc::Border separator;
     separator.Width(1);
     separator.Height(20);
@@ -2671,7 +2803,8 @@ void AppendRecents(BarState& state, const muxc::StackPanel& recents,
     for (size_t i = state.recentButtonCount; i-- > 0;) {
         const auto& path = state.recentFolders[i];
         const FolderStatus status = CheckFolderStatus(path);
-        auto button = MakeFolderButton(path, status, FolderTooltip(path, status, true));
+        auto button = MakeFolderButton(path, status, FolderTooltip(path, status, true),
+                                       i < labels.size() ? labels[i] : FolderLabel{});
         RememberFolderButton(state.recentFolderButtons, path, button, status);
         AttachFolderButtonHandlers(state, button, path, weakPanel, true);
         recents.Children().Append(button);
@@ -2743,7 +2876,7 @@ void RefreshRecentPanel(BarState& state, RecentView view,
     if (auto recents = state.recents.get()) {
         recents.Children().Clear();
         if (g_recentSettings.enabled) {
-            AppendRecents(state, recents, weakPanel);
+            AppendRecents(state, recents, weakPanel, view.labels);
         }
     }
 }
@@ -2778,9 +2911,23 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
             recentKey += path;
         }
     }
+    // Labels compare the bookmarks with the recent buttons, so a recent-only
+    // change can relabel a bookmark; that needs a full rebuild.
+    std::vector<std::wstring> barPaths = bookmarks;
+    barPaths.insert(barPaths.end(), recentView.folders.begin(),
+                    recentView.folders.begin() +
+                        std::min(recentView.folders.size(), g_recentSettings.buttons));
+    auto labels = FolderLabels(barPaths, g_parentForDuplicates);
+    std::wstring labelKey;
+    for (size_t i = 0; i < bookmarks.size(); ++i) {
+        labelKey += L'\x1f';
+        labelKey += labels[i].parent;
+    }
+    recentView.labels.assign(labels.begin() + bookmarks.size(), labels.end());
     ULONGLONG now = GetTickCount64();
     const bool fullRebuild = !state->renderComplete ||
         panel.Children().Size() == 0 || storage != state->renderedKey ||
+        labelKey != state->renderedLabelKey ||
         state->renderedSettingsGeneration != g_threadSettingsGeneration;
     const bool recentChanged = recentKey != state->renderedRecentKey;
     const bool checkFolders = state->lastFolderCheckAt == 0 ||
@@ -3037,9 +3184,13 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
     fxButton.ContextFlyout(drivesMenu);
     firstRow.Children().Append(fxButton);
 
-    for (const auto& path : bookmarks) {
+    size_t withParent = 0;
+    for (size_t i = 0; i < bookmarks.size(); ++i) {
+        const auto& path = bookmarks[i];
         FolderStatus status = CheckFolderStatus(path);
-        auto button = MakeFolderButton(path, status, FolderTooltip(path, status, false));
+        withParent += labels[i].parent.empty() ? 0 : 1;
+        auto button = MakeFolderButton(path, status, FolderTooltip(path, status, false),
+                                       labels[i]);
         RememberFolderButton(state->folderButtons, path, button, status);
         AttachFolderButtonHandlers(*state, button, path, weakPanel, false);
         firstRow.Children().Append(button);
@@ -3049,10 +3200,11 @@ void RefreshPanel(const muxc::StackPanel& panel) try {
 
     state->renderedKey = std::move(storage);
     state->renderedRecentKey = std::move(recentKey);
+    state->renderedLabelKey = std::move(labelKey);
     state->renderedSettingsGeneration = g_threadSettingsGeneration;
     state->renderComplete = true;
-    Wh_Log(L"Panel rebuilt: %zu bookmark(s), settings generation %llu",
-           bookmarks.size(), state->renderedSettingsGeneration);
+    Wh_Log(L"Panel rebuilt: %zu bookmark(s), %zu with parent, settings generation %llu",
+           bookmarks.size(), withParent, state->renderedSettingsGeneration);
     state->lastFolderCheckAt = now;
     state->lastLayoutWidth = 0;
     if (auto root = state->barRoot.get()) {
@@ -3395,7 +3547,7 @@ void ScheduleRecentWork(bool sync, bool refresh) {
 }
 
 // A thread message hook sees Ctrl+B before Explorer dispatches it, in the
-// file list, the navigation pane and the bar; Explorer has no Ctrl+B shortcut.
+// file list, the navigation pane and the bar; Explorer has no shortcut on it.
 // It also receives refresh requests that other threads post to the frame.
 thread_local HHOOK g_messageHook = nullptr;
 
@@ -3840,6 +3992,7 @@ void RemoveBarVisuals(BarState& state) {
     state.reflowing = false;
     state.renderedKey.clear();
     state.renderedRecentKey.clear();
+    state.renderedLabelKey.clear();
     state.renderComplete = false;
     state.lastFolderCheckAt = 0;
     ClearDrag(state);

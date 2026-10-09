@@ -129,17 +129,18 @@ installation and measured XAML layout. It adds no source instrumentation or cove
 source denominator remains unchanged; all previously covered branch outcomes
 remain covered when aggregated across template instantiations.
 
-Last completed ordinary aggregate run on 2026-10-02: **4,560/4,688 lines (97.27%)**,
-**1,827/1,983 branch outcomes (92.13%)**, and **263/264 functions (99.62%)**.
-All 63 existing check groups passed (39 native, 24 XAML), exit code 0, without a
-debugger. This is not a claim of 100% coverage or compatibility with live Explorer.
+Last completed ordinary aggregate run on 2026-10-09 (development 0.8.21):
+**4,335/4,461 lines (97.18%)**, **1,751/1,911 branch outcomes (91.63%)**, and
+**247/248 functions (99.60%)**. All native and XAML check groups passed, exit
+code 0, without a debugger. This is not a claim of 100% coverage or
+compatibility with live Explorer.
 
 ## Checking a failed scenario in the real application
 
 When a check fails, report its name, the observed failure, and whether its input
 represents a real user action or an injected platform fault. Give the matching
 Explorer steps and expected behavior; a fixture failure alone is not evidence
-that the installed mod fails. The suite targets development 0.8.18, so a manual
+that the installed mod fails. The suite targets development 0.8.21, so a manual
 check of a different installed version validates only that version. Installation
 and variant changes remain the user's choice.
 

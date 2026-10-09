@@ -345,6 +345,7 @@ void CheckSettingsAndRecents() {
     fixture::integers[L"recent.buttons"] = 99;
     fixture::integers[L"recent.history"] = -1;
     fixture::integers[L"bookmarkHotkey"] = 1;
+    fixture::integers[L"parentForDuplicates"] = 1;
     fixture::strings[L"recent.rcButton"] = L"clear";
     fixture::strings[L"fxCustomFolders[0].path"] = L" C:\\first\\ ";
     fixture::strings[L"fxCustomFolders[1].path"] = L"c:\\FIRST";
@@ -358,7 +359,8 @@ void CheckSettingsAndRecents() {
     LoadSettings();
     Require(UpdateThreadSettings() && g_recentSettings.enabled && g_recentSettings.buttons == 25 &&
             g_recentSettings.history == 25 && g_recentSettings.menuButton &&
-            g_recentSettings.rightClickClears && g_bookmarkHotkey,
+            g_recentSettings.rightClickClears && g_bookmarkHotkey &&
+            g_parentForDuplicates,
             "settings clamp or clear RC mode failed");
     Require(g_fxFolders.size() == 2 && g_fxFolders[0].label == L"first" &&
             g_fxFolders[1].label == L"Friendly", "FX validation or fallback labels failed");
@@ -404,6 +406,37 @@ void CheckSettingsAndRecents() {
     Require(fixture::storage[kRecentsKey].empty(), "explorer history not cleared");
     fixture::Reset();
     std::puts("PASS: settings clamps/RC modes, FX validation and recent history");
+}
+
+void CheckFolderLabels() {
+    auto text = [](const std::vector<std::wstring>& paths, bool showParents) {
+        std::vector<std::wstring> result;
+        for (const auto& label : FolderLabels(paths, showParents)) {
+            result.push_back(LabelText(label));
+        }
+        return result;
+    };
+    const std::vector<std::wstring> paths = {
+        L"C:\\projA\\src", L"D:\\work\\projB\\SRC", L"C:\\docs", L"C:\\",
+        L"\\\\server\\share"};
+    Require(text(paths, false) ==
+                std::vector<std::wstring>{L"src", L"SRC", L"docs", L"C:\\", L"share"},
+            "setting off changed folder labels");
+    Require(text(paths, true) ==
+                std::vector<std::wstring>{L"projA\\src", L"projB\\SRC", L"docs", L"C:\\", L"share"},
+            "case-insensitive duplicates did not show one parent level");
+    const auto deep = FolderLabels({L"C:\\a\\x\\src", L"D:\\b\\x\\src", L"E:\\y\\src",
+                                    L"F:\\src", L"\\\\host\\x\\src"}, true);
+    Require(LabelText(deep[0]) == L"a\\x\\src" && LabelText(deep[1]) == L"b\\x\\src" &&
+            LabelText(deep[2]) == L"y\\src" && LabelText(deep[3]) == L"F:\\src" &&
+            LabelText(deep[4]) == L"host\\x\\src" &&
+            deep[0].parent == L"a\\x" && deep[0].name == L"src",
+            "matching parents did not add levels until labels differ");
+    Require(text({L"C:\\", L"D:\\", L"plain", L"plain"}, true) ==
+                std::vector<std::wstring>{L"C:\\", L"D:\\", L"plain", L"plain"} &&
+            text({}, true).empty(),
+            "drive roots or paths without a folder name gained a parent");
+    std::puts("PASS: folder labels with parents for duplicates, deeper levels, case and roots");
 }
 
 struct BackupFixture {
@@ -682,6 +715,7 @@ int main(int argc, char** argv) {
     CheckInsertionMatrix();
     CheckStoredMutations();
     CheckSettingsAndRecents();
+    CheckFolderLabels();
     CheckBackupFiles();
     CheckFramesAndSettings();
     CheckStorageMutex();

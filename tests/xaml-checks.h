@@ -170,6 +170,111 @@ void CheckXamlPanelRefresh() {
     std::puts("PASS: real XAML panel construction, incremental refresh, recent menu and teardown");
 }
 
+std::wstring VisibleFolderLabel(const muxc::Button& button) {
+    auto label = button.Content().as<muxc::StackPanel>().Children().GetAt(1);
+    if (auto text = label.try_as<muxc::TextBlock>()) {
+        return std::wstring(text.Text());
+    }
+    std::wstring result;
+    for (const auto& child : label.as<muxc::Grid>().Children()) {
+        result += child.as<muxc::TextBlock>().Text();
+    }
+    return result;
+}
+
+void CheckXamlDuplicateLabels() {
+    // A long parent is trimmed; the name keeps its full width and stays visible.
+    const std::wstring longParent(60, L'p');
+    auto button = MakeFolderButton(L"C:\\x\\src", FolderStatus::Unknown, L"tip",
+                                   {longParent, L"src"});
+    auto content = button.Content().as<muxc::StackPanel>();
+    auto parts = content.Children().GetAt(1).as<muxc::Grid>();
+    auto parentText = parts.Children().GetAt(0).as<muxc::TextBlock>();
+    auto nameText = parts.Children().GetAt(1).as<muxc::TextBlock>();
+    auto reference = MakeFolderText(L"\\src");
+    reference.Measure({1000, 1000});
+    muxc::StackPanel host;
+    host.Orientation(muxc::Orientation::Horizontal);
+    host.Children().Append(button);
+    host.Measure({1000, 1000});
+    host.Arrange({0, 0, 1000, 1000});
+    Require(VisibleFolderLabel(button) == longParent + L"\\src" &&
+            parentText.ActualWidth() > 0 && parts.ActualWidth() <= 155.5 &&
+            nameText.ActualWidth() >= reference.DesiredSize().Width - 0.5 &&
+            button.Height() == kButtonHeight && button.MaxWidth() == 208,
+            "long parent hid the folder name or changed button geometry");
+    auto shortButton = MakeFolderButton(L"C:\\projA\\src", FolderStatus::Unknown, L"tip",
+                                        {L"projA", L"src"});
+    host.Children().Append(shortButton);
+    host.Measure({1000, 1000});
+    host.Arrange({0, 0, 1000, 1000});
+    auto shortParts = shortButton.Content().as<muxc::StackPanel>().Children().GetAt(1).as<muxc::Grid>();
+    Require(VisibleFolderLabel(shortButton) == L"projA\\src" &&
+            shortParts.ActualWidth() < 150 &&
+            shortParts.Children().GetAt(0).as<muxc::TextBlock>().ActualWidth() > 0,
+            "short parent and name were not both shown at their own width");
+
+    // A recent-only change relabels bookmarks; a hover refresh keeps labels.
+    fixture::Reset();
+    BackupFixture scratch;
+    fixture::integers[L"recent.enabled"] = 1;
+    fixture::integers[L"recent.buttons"] = 2;
+    fixture::integers[L"recent.history"] = 10;
+    fixture::integers[L"parentForDuplicates"] = 1;
+    LoadSettings();
+    UpdateThreadSettings();
+    XamlBarFixture bar;
+    auto& state = *bar.state;
+    const auto bookmark = scratch.directory + L"\\src";
+    const auto parentName = ButtonLabel(scratch.directory);
+    auto recentButton = [&](const wchar_t* path) {
+        for (const auto& entry : state.recentFolderButtons) {
+            if (entry.path == path) return entry.button.get();
+        }
+        throw winrt::hresult_error(E_FAIL, L"recent button not found");
+    };
+    SaveBookmarksLocked({bookmark, scratch.directory + L"\\docs"});
+    RecordExplorerRecent(L"\\\\test.invalid\\other");
+    RefreshPanel(bar.panel);
+    auto first = state.folderButtons[0].button.get();
+    Require(first && VisibleFolderLabel(first) == L"src",
+            "unique bookmark label gained a parent");
+    RecordExplorerRecent(L"\\\\test.invalid\\share\\SRC");
+    RefreshPanel(bar.panel);
+    auto relabeled = state.folderButtons[0].button.get();
+    Require(relabeled && VisibleFolderLabel(relabeled) == parentName + L"\\src" &&
+            VisibleFolderLabel(recentButton(L"\\\\test.invalid\\share\\SRC")) == L"share\\SRC" &&
+            VisibleFolderLabel(state.folderButtons[1].button.get()) == L"docs",
+            "recent-only change left a stale bookmark label");
+    Require(CreateDirectoryW(bookmark.c_str(), nullptr), "bookmark folder setup failed");
+    state.lastFolderCheckAt = 0;
+    RefreshPanel(bar.panel);
+    Require(state.folderButtons[0].button.get() == relabeled &&
+            state.folderButtons[0].status == FolderStatus::Available &&
+            VisibleFolderLabel(relabeled) == parentName + L"\\src",
+            "hover refresh replaced or reset a label with a parent");
+    Require(RemoveDirectoryW(bookmark.c_str()), "bookmark folder cleanup failed");
+    muxc::MenuFlyout menu;
+    auto anchor = MakeLabelButton(L"RC");
+    state.visibleRecents = 0;
+    FillRecentMenu(state, menu, winrt::make_weak(anchor));
+    Require(menu.Items().GetAt(0).as<muxc::MenuFlyoutItem>().Text() == L"share\\SRC",
+            "RC menu label differs from the bar rule");
+    RemoveRecent(L"\\\\test.invalid\\share\\SRC");
+    RefreshPanel(bar.panel);
+    Require(VisibleFolderLabel(state.folderButtons[0].button.get()) == L"src",
+            "removed duplicate left a parent on the bookmark label");
+    fixture::integers[L"parentForDuplicates"] = 0;
+    RecordExplorerRecent(L"\\\\test.invalid\\share\\SRC");
+    LoadSettings();
+    RefreshPanel(bar.panel);
+    Require(VisibleFolderLabel(state.folderButtons[0].button.get()) == L"src" &&
+            VisibleFolderLabel(recentButton(L"\\\\test.invalid\\share\\SRC")) == L"SRC",
+            "setting off still showed parents");
+    fixture::Reset();
+    std::puts("PASS: real XAML parent labels for duplicates, trimming, recent-only relabel and hover");
+}
+
 void PumpXamlMessages(unsigned milliseconds = 100) {
     const auto deadline = GetTickCount64() + milliseconds;
     const auto wake = SetTimer(nullptr, 0, 10, nullptr);
@@ -566,6 +671,7 @@ void CheckXamlRuntime() {
     CheckXamlReflowAndDropMarkers();
     CheckXamlRecentFitting();
     CheckXamlPanelRefresh();
+    CheckXamlDuplicateLabels();
     // Exercise manually arranged trees before closing any top-level Window;
     // CBS stops layout for detached trees after the last Window is closed.
     CheckExternalDropContracts();

@@ -19,10 +19,12 @@ struct SettingsScope {
     RecentSettings sharedRecent;
     std::vector<FxFolder> sharedFx;
     bool sharedHotkey;
+    bool sharedParentForDuplicates;
     ULONGLONG generation;
     RecentSettings recent = g_recentSettings;
     std::vector<FxFolder> fx = g_fxFolders;
     bool hotkey = g_bookmarkHotkey;
+    bool parentForDuplicates = g_parentForDuplicates;
     ULONGLONG threadGeneration = g_threadSettingsGeneration;
     bool applyPending = g_settingsApplyPending;
     SettingsScope() {
@@ -30,6 +32,7 @@ struct SettingsScope {
         sharedRecent = g_sharedRecentSettings;
         sharedFx = g_sharedFxFolders;
         sharedHotkey = g_sharedBookmarkHotkey;
+        sharedParentForDuplicates = g_sharedParentForDuplicates;
         generation = g_settingsGeneration;
     }
     ~SettingsScope() {
@@ -37,10 +40,12 @@ struct SettingsScope {
         g_sharedRecentSettings = sharedRecent;
         g_sharedFxFolders = std::move(sharedFx);
         g_sharedBookmarkHotkey = sharedHotkey;
+        g_sharedParentForDuplicates = sharedParentForDuplicates;
         g_settingsGeneration = generation;
         g_recentSettings = recent;
         g_fxFolders = std::move(fx);
         g_bookmarkHotkey = hotkey;
+        g_parentForDuplicates = parentForDuplicates;
         g_threadSettingsGeneration = threadGeneration;
         g_settingsApplyPending = applyPending;
     }
