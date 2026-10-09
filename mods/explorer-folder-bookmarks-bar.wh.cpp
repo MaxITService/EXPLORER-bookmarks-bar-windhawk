@@ -2,7 +2,7 @@
 // @id              explorer-folder-bookmarks-bar
 // @name            Explorer Folder Bookmarks Bar
 // @description     Adds a folder bookmarks bar under the address bar of Windows 11 File Explorer.
-// @version         0.8.26
+// @version         0.8.30
 // @author          Maxim Fomin
 // @github          https://github.com/MaxITService
 // @include         explorer.exe
@@ -21,9 +21,9 @@ A row of folder bookmarks under the address bar of Windows 11 File Explorer.
 
 ![Explorer Folder Bookmarks Bar in File Explorer](https://raw.githubusercontent.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/main/Promo/How-it-works.gif)
 
-After enabling or updating the mod, open a new File Explorer window. Windows
-that were already open may not get the bar. Once a window has the bar, it
-follows changes made in other windows and in settings.
+The bar appears in new File Explorer windows. Windows that were already open
+get it too in most cases; if one doesn't, open a new window. Once a window has
+the bar, it follows changes made in other windows and in settings.
 
 ## Bookmarks
 
@@ -55,8 +55,9 @@ entry to open it in a new tab.
 
 Add your folders in **Settings → FX custom folders**: an absolute path
 (`%NAME%` variables work) and an optional label. Local, network and removable
-folders all work. A missing local folder is hidden until it's back; network
-and removable folders are always listed.
+folders all work. A folder is hidden while it's missing from a local disk or
+its drive is unplugged. Network folders and folders on plugged-in removable
+drives are always listed.
 
 ## Backup
 
@@ -69,6 +70,8 @@ nothing.
 Off by default. Turn on **Recent folders → Show recent folders** to show
 buttons for folders you recently opened in File Explorer at the right end of
 the bar, newest on the right: 3 by default, up to 25.
+
+![Recent folders on the bookmarks bar](https://raw.githubusercontent.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/main/Promo/How_recents_work.gif)
 
 - Left-click **RC** for the rest of the list (10 in total by default, up
   to 25).

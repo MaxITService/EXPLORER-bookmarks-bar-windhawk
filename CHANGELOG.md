@@ -30,7 +30,8 @@ Development source in `mods/`, not yet tested in File Explorer.
 - Hovering a bookmark updates its icon and missing-folder mark without
   redrawing the bar.
 - Desktop, Documents and Downloads in FX follow the custom-folder rule:
-  hidden only when missing from a local disk.
+  hidden only when missing from a local disk or when their drive is
+  unplugged.
 
 ### Fixed
 

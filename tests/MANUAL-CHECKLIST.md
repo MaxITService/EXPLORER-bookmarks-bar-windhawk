@@ -10,7 +10,7 @@ Save bookmarks…**. Use disposable folders under a unique `%TEMP%` subfolder:
 long name. Keep your original backup separate from test backups. Restore your
 bookmarks and any changed settings afterward.
 
-Items marked **Development feature** target the development 0.8.26 source.
+Items marked **Development feature** target the development 0.8.30 source.
 The catalog 0.7.8 does not have these features; skip them when unavailable.
 Do not switch variants just to complete this list. The frozen personal and
 Double Decker variants have different feature sets or layouts.
@@ -91,7 +91,7 @@ results, screenshots, backups and generated output outside the repository.
     - **Steps:** With your original backup secured, fill the list with 32
       distinct disposable folders. Try adding a 33rd. Remove one, then retry.
     - **Expected:** The list never exceeds 32 and existing entries are preserved.
-      Adding succeeds after a slot is freed. Development 0.8.26 shows a short
+      Adding succeeds after a slot is freed. Development 0.8.30 shows a short
       notice when the full list prevents an addition.
 
 12. **Wrap, collapse and reach overflow**
@@ -151,17 +151,19 @@ results, screenshots, backups and generated output outside the repository.
       apply to existing panels, and closing a window does not break updates in
       surviving or newly opened windows.
 
-18. **Ctrl+B toggling and typing protection — Development feature**
+18. **Ctrl+B shortcut, typing protection — Development feature**
     - **Steps:** Check that Ctrl+B does nothing until **Ctrl+B shortcut** is
       turned on. Then, with the file list focused and no selection, press Ctrl+B
       twice. Repeat with two folders selected, then a mixed folder/file
       selection. Press it while typing in the address bar, search box and a
-      rename field. Turn the shortcut off and try again.
+      rename field. Turn the shortcut off and try again. Press Alt+1 and Alt+2
+      with focus in the file list, the navigation pane and the bar.
     - **Expected:** The current folder toggles; selected folders are added, or
       removed when all are already bookmarked. Files/ZIPs are not bookmarked.
       At most 20 folders are handled per press. Typing fields and the disabled
       shortcut leave bookmarks unchanged; holding the key does not repeatedly
-      toggle them.
+      toggle them. There is no Alt+number setting, and Alt+number does not open
+      a bookmark, including after updating with the old setting enabled.
 
 19. **Drop folders from the file list — Development feature**
     - **Steps:** Drag two folders from the file list onto the bar at a chosen
