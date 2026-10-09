@@ -13,7 +13,7 @@ A [Windhawk](https://windhawk.net/) mod for Windows 11 File Explorer on x64 and 
 | Version | Source | Status |
 | --- | --- | --- |
 | **0.7.8** | [Root source](explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/explorer-folder-bookmarks-bar.wh.cpp) | Tested in File Explorer. In the Windhawk catalog since September 29, 2026 ([PR #5755](https://github.com/ramensoftware/windhawk-mods/pull/5755)). |
-| **0.8.30** | [Development source](mods/explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/mods/explorer-folder-bookmarks-bar.wh.cpp) | Source only, **untested** in File Explorer. New features are listed in the [changelog](CHANGELOG.md). |
+| **0.8.31** | [Development source](mods/explorer-folder-bookmarks-bar.wh.cpp) · [download source](https://github.com/MaxITService/EXPLORER-bookmarks-bar-windhawk/raw/main/mods/explorer-folder-bookmarks-bar.wh.cpp) | Source only, **untested** in File Explorer. New features are listed in the [changelog](CHANGELOG.md). |
 
 The root file is the tested 0.7.8 release, unchanged. Development happens in `mods/`.
 
@@ -21,7 +21,7 @@ The root file is the tested 0.7.8 release, unchanged. Development happens in `mo
 
 **From the Windhawk catalog:** Search Windhawk for **Explorer Folder Bookmarks Bar**, select the mod, and click **Install**. This installs **0.7.8**.
 
-**From source:** Download either source linked above. In Windhawk, enable developer mode if **Create a new mod** is hidden, then create a mod or edit your existing `explorer-folder-bookmarks-bar` mod. Replace the entire `mod.wh.cpp` editor content with the source, click **Compile Mod**, and enable the mod. Version 0.8.30 is available only this way; compiling may take a while. Both files use the same mod ID, so only one can be active at a time.
+**From source:** Download either source linked above. In Windhawk, enable developer mode if **Create a new mod** is hidden, then create a mod or edit your existing `explorer-folder-bookmarks-bar` mod. Replace the entire `mod.wh.cpp` editor content with the source, click **Compile Mod**, and enable the mod. Version 0.8.31 is available only this way; compiling may take a while. Both files use the same mod ID, so only one can be active at a time.
 
 After installing, enabling or updating the mod, open a new File Explorer window; windows already open may not get the bar.
 
@@ -29,7 +29,7 @@ After installing, enabling or updating the mod, open a new File Explorer window;
 
 - Click **+** to bookmark the current folder. Click a bookmark to open it; Ctrl+click opens it in a new tab. Drag to reorder. Middle-click removes a bookmark; the folder itself is not touched. Hover shows the full path.
 - Left-click **FX** for your profile folder, Desktop, Documents, Downloads and your own folders. Right-click **FX** for all drives. Ctrl+click a menu entry to open it in a new tab.
-- Add your folders in Windhawk settings under **FX custom folders**: an absolute path (environment variables work) and an optional label. A folder is hidden while it's missing from a local disk or its drive is unplugged; network folders and folders on plugged-in removable drives are always listed. In 0.7.8, open a new window after changing settings; 0.8.30 updates open windows.
+- Add your folders in Windhawk settings under **FX custom folders**: an absolute path (environment variables work) and an optional label. A folder is hidden while it's missing from a local disk or its drive is unplugged; network folders and folders on plugged-in removable drives are always listed. In 0.7.8, open a new window after changing settings; 0.8.31 updates open windows.
 - Right-click **+** to save or load a bookmark backup (JSON).
 
 ## New since 0.7.8
