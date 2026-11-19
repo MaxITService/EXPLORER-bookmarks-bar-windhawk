@@ -52,3 +52,4 @@ Licensed under [MIT](LICENSE).
 - [OneClickPrompts](https://github.com/MaxITService/OneClickPrompts) — prompt shortcuts for AI chats.
 - [Console2Ai](https://github.com/MaxITService/Console2Ai) — send a PowerShell buffer to AI.
 - [Ping-Plotter-PS51](https://github.com/MaxITService/Ping-Plotter-PS51) — a PowerShell ping plotter.
+- [Maxidian](https://github.com/MaxITService/Maxidian) — a single-file offline Obsidian-compatible Markdown editor for the browser.
